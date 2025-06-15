@@ -5,7 +5,6 @@ import {
 	isAlphaNumeric,
 	isDigit,
 	isEndOfFile,
-	isWhitespace,
 	lookahead,
 	match,
 	peek,

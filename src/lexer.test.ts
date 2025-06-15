@@ -40,7 +40,7 @@ test("should tokenize arithmetic and floats", () => {
 	]);
 });
 
-test.only("should tokenize string assignment", () => {
+test("should tokenize string assignment", () => {
 	const input = 'name := "Pinky"';
 	const tokens = tokenize(input);
 	expect(tokens).toEqual([
