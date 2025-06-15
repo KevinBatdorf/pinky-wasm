@@ -1,7 +1,7 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Editor from "react-simple-code-editor";
 import pinkyGrammar from "../assets/pinky.tmLanguage.json";
-import { createHighlighter } from "shiki";
+import { createHighlighter, type Highlighter } from "shiki";
 import type { Token } from "../tokens";
 
 type CodeEditorProps = {
@@ -10,14 +10,19 @@ type CodeEditorProps = {
 	token: Token | null;
 };
 
-const highlighter = await createHighlighter({
-	langs: [pinkyGrammar],
-	themes: ["aurora-x"],
-});
-
 export const CodeEditor = (props: CodeEditorProps) => {
 	const textAreaRef = useRef<HTMLDivElement>(null);
+	const [highlighter, setHighlighter] = useState<Highlighter | null>(null);
 	const { value, onChange, token, ...remainingProps } = props;
+
+	useEffect(() => {
+		createHighlighter({
+			langs: [pinkyGrammar],
+			themes: ["aurora-x"],
+		}).then(setHighlighter);
+	}, []);
+
+	if (!highlighter) return null;
 
 	return (
 		<div ref={textAreaRef} className="overflow-y-auto h-full">
