@@ -38,7 +38,8 @@ function App() {
 				<div className="pl-4 text-[#FF66C4] font-mono">Pinky</div>
 				<CodeEditor token={hoveredToken} value={code} onChange={setCode} />
 			</div>
-			<div>output</div>
+			<div className="mx-4">AST (coming soon)</div>
+			<div className="mx-4">output (coming soon)</div>
 		</div>
 	);
 }
