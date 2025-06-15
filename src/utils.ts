@@ -27,9 +27,6 @@ export const advance = (
 	const char = peek(source, curr);
 	let nextLine = line;
 	let nextColumn = column;
-	console.log(
-		`Advancing from line ${line}, column ${column}, current index ${curr} with char '${char}'`,
-	);
 	if (isNewline(char)) {
 		nextLine++;
 		nextColumn = 1;

@@ -1,5 +1,5 @@
-import { type TokenType, type Token, keywords, tokenTypes } from "./tokens";
-import { advance, match, peek } from "./utils";
+import { type TokenType, type Token, keywords, tokenTypes } from "../tokens";
+import { advance, match, peek } from "../utils";
 
 export const tokenize = (src: string): Token[] => {
 	const tokens: Token[] = [];
