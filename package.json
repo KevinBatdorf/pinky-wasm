@@ -13,8 +13,12 @@
 		"coverage": "vitest run --coverage"
 	},
 	"dependencies": {
+		"@tailwindcss/vite": "^4.1.10",
 		"react": "^19.1.0",
-		"react-dom": "^19.1.0"
+		"react-dom": "^19.1.0",
+		"react-simple-code-editor": "^0.14.1",
+		"shiki": "^3.6.0",
+		"tailwindcss": "^4.1.10"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "1.9.4",

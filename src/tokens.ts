@@ -1,10 +1,6 @@
-export type TokenType =
+type TokenType =
 	| "LPAREN"
 	| "RPAREN"
-	| "LCURLY"
-	| "RCURLY"
-	| "LSQUAR"
-	| "RSQUAR"
 	| "COMMA"
 	| "COMMENT"
 	| "DOT"
@@ -14,13 +10,9 @@ export type TokenType =
 	| "SLASH"
 	| "CARET"
 	| "MOD"
-	| "COLON"
-	| "SEMICOLON"
-	| "QUESTION"
 	| "NOT"
 	| "GT"
 	| "LT"
-	| "EQ"
 	| "GE"
 	| "LE"
 	| "NE"
@@ -28,8 +20,7 @@ export type TokenType =
 	| "ASSIGN"
 	| "IDENTIFIER"
 	| "STRING"
-	| "INTEGER"
-	| "FLOAT"
+	| "NUMBER"
 	| "IF"
 	| "THEN"
 	| "ELSE"
@@ -58,7 +49,8 @@ export interface Token {
 
 export const keywords: { [key: string]: TokenType } = {
 	if: "IF",
-	thenKeyword: "THEN",
+	// biome-ignore lint:
+	then: "THEN",
 	else: "ELSE",
 	true: "TRUE",
 	false: "FALSE",
@@ -78,10 +70,6 @@ export const keywords: { [key: string]: TokenType } = {
 export const tokenTypes: { [key: string]: TokenType } = {
 	"(": "LPAREN",
 	")": "RPAREN",
-	"{": "LCURLY",
-	"}": "RCURLY",
-	"[": "LSQUAR",
-	"]": "RSQUAR",
 	",": "COMMA",
 	".": "DOT",
 	"+": "PLUS",
@@ -90,13 +78,9 @@ export const tokenTypes: { [key: string]: TokenType } = {
 	"/": "SLASH",
 	"^": "CARET",
 	"%": "MOD",
-	":": "COLON",
-	";": "SEMICOLON",
-	"?": "QUESTION",
 	"!": "NOT",
 	">": "GT",
 	"<": "LT",
-	"=": "EQ",
 	">=": "GE",
 	"<=": "LE",
 	"!=": "NE",

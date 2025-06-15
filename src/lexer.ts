@@ -1,0 +1,175 @@
+import { type Token, keywords, tokenTypes } from "./tokens";
+import {
+	advance,
+	isAlpha,
+	isAlphaNumeric,
+	isDigit,
+	isEndOfFile,
+	isWhitespace,
+	lookahead,
+	match,
+	peek,
+} from "./utils";
+
+export const tokenize = (src: string): Token[] => {
+	const tokens: Token[] = [];
+	let pos = { line: 1, column: 1, current: 0 };
+
+	const addToken = ({
+		type,
+		value,
+		line = pos.line,
+		column = pos.column,
+		start = pos.current - value.length,
+		end = pos.current,
+	}: Omit<Token, "line" | "column" | "start" | "end"> &
+		Partial<Pick<Token, "line" | "column" | "start" | "end">>) => {
+		tokens.push({ type, value, line, column, start, end });
+	};
+
+	while (!isEndOfFile(peek(src, pos.current))) {
+		const ch = peek(src, pos.current);
+		// mark the start and column
+		const start = pos.current;
+		const column = pos.column;
+		switch (ch) {
+			case " ":
+			case "\t":
+			case "\r":
+			case "\n":
+				pos = advance(src, pos.current, pos.line, pos.column);
+				break;
+			case "(":
+			case ")":
+			case ".":
+			case ",":
+			case "+":
+			case "*":
+			case "^":
+			case "/":
+			case "%": {
+				pos = advance(src, pos.current, pos.line, pos.column);
+				addToken({ type: tokenTypes[ch], value: ch, start, column });
+				break;
+			}
+			case "'":
+			case '"': {
+				let value = "";
+				// consume the opening quote
+				pos = advance(src, pos.current, pos.line, pos.column);
+				while (
+					!isEndOfFile(peek(src, pos.current)) &&
+					!match(src, pos.current, ch)
+				) {
+					// consume to the end of the line
+					value += peek(src, pos.current);
+					pos = advance(src, pos.current, pos.line, pos.column);
+				}
+				if (isEndOfFile(peek(src, pos.current))) {
+					throw new Error(
+						`Unterminated string literal at line ${pos.line}, column ${pos.column}`,
+					);
+				}
+				// consume the closing quote
+				pos = advance(src, pos.current, pos.line, pos.column);
+				addToken({ type: "STRING", value, start, column });
+				break;
+			}
+			case ">":
+			case "<": {
+				// handle >= and <=
+				if (lookahead(src, pos.current, 1) === "=") {
+					// consume the second character
+					pos = advance(src, pos.current, pos.line, pos.column);
+					pos = advance(src, pos.current, pos.line, pos.column);
+					addToken({
+						type: tokenTypes[`${ch}=`],
+						value: `${ch}=`,
+						start,
+						column,
+					});
+					break;
+				}
+				// handle < and >
+				pos = advance(src, pos.current, pos.line, pos.column);
+				addToken({ type: tokenTypes[ch], value: ch, start, column });
+				break;
+			}
+			case "~":
+			case ":":
+			case "=": {
+				if (lookahead(src, pos.current, 1) !== "=") {
+					throw new Error(
+						`Unexpected character '${ch}' at line ${pos.line}, column ${pos.column}`,
+					);
+				}
+				// consume the second = character
+				pos = advance(src, pos.current, pos.line, pos.column);
+				pos = advance(src, pos.current, pos.line, pos.column);
+				addToken({
+					type: tokenTypes[`${ch}=`],
+					value: `${ch}=`,
+					start,
+					column,
+				});
+				break;
+			}
+			case "-": {
+				if (lookahead(src, pos.current, 1) !== "-") {
+					pos = advance(src, pos.current, pos.line, pos.column);
+					addToken({ type: "MINUS", value: ch, start, column });
+					break;
+				}
+				// Handle comment
+				let value = "";
+				while (
+					!isEndOfFile(peek(src, pos.current)) &&
+					!match(src, pos.current, "\n")
+				) {
+					// consume to the end of the line
+					value += peek(src, pos.current);
+					pos = advance(src, pos.current, pos.line, pos.column);
+				}
+				addToken({ type: "COMMENT", value, start, column });
+				break;
+			}
+			default:
+				if (isDigit(ch)) {
+					let value = "";
+					while (
+						!isEndOfFile(peek(src, pos.current)) &&
+						(isDigit(peek(src, pos.current)) || match(src, pos.current, "."))
+					) {
+						const decimal = match(src, pos.current, ".");
+						if (decimal && !isDigit(lookahead(src, pos.current, 1))) {
+							throw new Error(
+								`Unexpected character '.' at line ${pos.line}, column ${pos.column}`,
+							);
+						}
+						value += peek(src, pos.current);
+						pos = advance(src, pos.current, pos.line, pos.column);
+					}
+					addToken({ type: "NUMBER", value, start, column });
+					break;
+				}
+				if (isAlpha(ch)) {
+					let value = "";
+					while (
+						!isEndOfFile(peek(src, pos.current)) &&
+						isAlphaNumeric(peek(src, pos.current))
+					) {
+						value += peek(src, pos.current);
+						pos = advance(src, pos.current, pos.line, pos.column);
+					}
+					const type = keywords[value] || "IDENTIFIER";
+					addToken({ type, value, start, column });
+					break;
+				}
+
+				throw new Error(
+					`Unexpected character '${ch}' at line ${pos.line}, column ${pos.column}`,
+				);
+		}
+	}
+	return tokens;
+};

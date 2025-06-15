@@ -7,6 +7,9 @@
 		"module": "ESNext",
 		"skipLibCheck": true,
 
+        "resolveJsonModule": true,
+        "esModuleInterop": true,
+
 		"moduleResolution": "bundler",
 		"allowImportingTsExtensions": true,
 		"verbatimModuleSyntax": true,
