@@ -1,5 +1,5 @@
 import type { Token } from "../tokens";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { tokenize } from "../lexer";
 type TokensType = {
 	code: string;
