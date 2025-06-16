@@ -3,7 +3,7 @@ import { tokenize } from "./lexer";
 
 test("should tokenize all punctuation and symbol tokens", () => {
 	const input = "(),.+-*/^%";
-	const tokens = tokenize(input);
+	const { tokens } = tokenize(input);
 	const expected = [
 		{ type: "LPAREN", value: "(", start: 0, end: 1, column: 1, line: 1 },
 		{ type: "RPAREN", value: ")", start: 1, end: 2, column: 2, line: 1 },
@@ -20,7 +20,7 @@ test("should tokenize all punctuation and symbol tokens", () => {
 });
 test("should tokenize variable assignment and numbers", () => {
 	const input = "x := 42";
-	const tokens = tokenize(input);
+	const { tokens } = tokenize(input);
 	expect(tokens).toEqual([
 		{ type: "IDENTIFIER", value: "x", start: 0, end: 1, column: 1, line: 1 },
 		{ type: "ASSIGN", value: ":=", start: 2, end: 4, column: 3, line: 1 },
@@ -30,7 +30,7 @@ test("should tokenize variable assignment and numbers", () => {
 
 test("should tokenize arithmetic and floats", () => {
 	const input = "y := x + 3.14";
-	const tokens = tokenize(input);
+	const { tokens } = tokenize(input);
 	expect(tokens).toEqual([
 		{ type: "IDENTIFIER", value: "y", start: 0, end: 1, column: 1, line: 1 },
 		{ type: "ASSIGN", value: ":=", start: 2, end: 4, column: 3, line: 1 },
@@ -42,7 +42,7 @@ test("should tokenize arithmetic and floats", () => {
 
 test("should tokenize string assignment", () => {
 	const input = 'name := "Pinky"';
-	const tokens = tokenize(input);
+	const { tokens } = tokenize(input);
 	expect(tokens).toEqual([
 		{
 			type: "IDENTIFIER",
@@ -59,7 +59,7 @@ test("should tokenize string assignment", () => {
 
 test("should tokenize if statement", () => {
 	const input = 'if x > 0 then print("positive") end';
-	const tokens = tokenize(input);
+	const { tokens } = tokenize(input);
 	expect(tokens).toEqual([
 		{ type: "IF", value: "if", start: 0, end: 2, column: 1, line: 1 },
 		{ type: "IDENTIFIER", value: "x", start: 3, end: 4, column: 4, line: 1 },
@@ -90,7 +90,7 @@ test("should tokenize if statement", () => {
 
 test("should tokenize while loop", () => {
 	const input = "while x < 10 do x := x + 1 end";
-	const tokens = tokenize(input);
+	const { tokens } = tokenize(input);
 	expect(tokens).toEqual([
 		{ type: "WHILE", value: "while", start: 0, end: 5, column: 1, line: 1 },
 		{ type: "IDENTIFIER", value: "x", start: 6, end: 7, column: 7, line: 1 },
@@ -122,7 +122,7 @@ test("should tokenize while loop", () => {
 
 test("should tokenize function definition and call", () => {
 	const input = "func add(a, b) do ret a + b end\nresult := add(2, 3)";
-	const tokens = tokenize(input);
+	const { tokens } = tokenize(input);
 	expect(tokens).toEqual([
 		{ type: "FUNC", value: "func", start: 0, end: 4, column: 1, line: 1 },
 		{
@@ -203,7 +203,7 @@ test("should tokenize nested for loops", () => {
 		print(i, j)
 	end
 end`;
-	const tokens = tokenize(input);
+	const { tokens } = tokenize(input);
 	expect(tokens).toEqual([
 		{ type: "FOR", value: "for", start: 0, end: 3, column: 1, line: 1 },
 		{ type: "IDENTIFIER", value: "i", start: 4, end: 5, column: 5, line: 1 },
@@ -232,7 +232,7 @@ end`;
 
 test("should tokenize single-character comparison operators", () => {
 	const input = "x > 1 y < 2";
-	const tokens = tokenize(input);
+	const { tokens } = tokenize(input);
 	expect(tokens).toEqual([
 		{ type: "IDENTIFIER", value: "x", start: 0, end: 1, column: 1, line: 1 },
 		{ type: "GT", value: ">", start: 2, end: 3, column: 3, line: 1 },
@@ -243,9 +243,25 @@ test("should tokenize single-character comparison operators", () => {
 	]);
 });
 
+test("should error on invalid input", () => {
+	const input = "func main(): do\n  print(Hello, World!)\nend";
+	const { tokens, error } = tokenize(input);
+	expect(tokens).toEqual([
+		{ type: "FUNC", value: "func", start: 0, end: 4, column: 1, line: 1 },
+		{ type: "IDENTIFIER", value: "main", start: 5, end: 9, column: 6, line: 1 },
+		{ type: "LPAREN", value: "(", start: 9, end: 10, column: 10, line: 1 },
+		{ type: "RPAREN", value: ")", start: 10, end: 11, column: 11, line: 1 },
+	]);
+	expect(error).toEqual({
+		line: 1,
+		column: 12,
+		message: "Unexpected character ':'",
+	});
+});
+
 test("should tokenize >= and <=", () => {
 	const input = "a >= 10 b <= 20";
-	const tokens = tokenize(input);
+	const { tokens } = tokenize(input);
 	expect(tokens).toEqual([
 		{ type: "IDENTIFIER", value: "a", start: 0, end: 1, column: 1, line: 1 },
 		{ type: "GE", value: ">=", start: 2, end: 4, column: 3, line: 1 },
@@ -260,7 +276,7 @@ test("should tokenize single and inline comments", () => {
 	const string = `-- This is a comment
 x := 10 -- Inline comment
 --- Another comment`;
-	const tokens = tokenize(string);
+	const { tokens } = tokenize(string);
 	const tok1 = {
 		type: "COMMENT",
 		value: "-- This is a comment",
