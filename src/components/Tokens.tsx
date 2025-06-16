@@ -1,35 +1,24 @@
+import { useEffect, useRef } from "react";
 import type { Token } from "../tokens";
-import { useEffect, useMemo } from "react";
-import { tokenize } from "../lexer";
 type TokensType = {
-	code: string;
+	tokens: Token[];
+	error?: { line: number; column: number; message: string } | null;
 	handleTokenHover: (token: Token) => void;
 	handleTokenLeave: () => void;
-	setTokenPerf: (perf: number) => void;
 };
 
 export const Tokens = ({
-	code,
+	tokens,
+	error,
 	handleTokenHover,
 	handleTokenLeave,
-	setTokenPerf,
 }: TokensType) => {
-	const { tokens, perf } = useMemo<{ tokens: Token[]; perf: number }>(() => {
-		try {
-			const now = performance.now();
-			const tokens = tokenize(code);
-			return { tokens, perf: performance.now() - now };
-		} catch (error) {
-			console.error("Error tokenizing code:", error);
-			// TODO: could the lexer handle errors?
-			// todo: highlght lines with errors?
-			return { tokens: [], perf: 0 };
-		}
-	}, [code]);
+	const errorRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
-		setTokenPerf(perf);
-	}, [perf, setTokenPerf]);
+		if (!errorRef.current || !error) return;
+		errorRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+	}, [error]);
 
 	if (!tokens.length) return null;
 
@@ -49,6 +38,11 @@ export const Tokens = ({
 					</div>
 				);
 			})}
+			{error && (
+				<div ref={errorRef} className="text-red-500 text-wrap">
+					{`Error: ${error.message} at line ${error.line}, column ${error.column}`}
+				</div>
+			)}
 		</div>
 	);
 };

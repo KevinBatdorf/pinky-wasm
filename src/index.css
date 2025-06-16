@@ -22,3 +22,7 @@ input:focus-visible {
 		color: black !important;
 	}
 }
+.error-token {
+	background: #ff0000 !important;
+	color: white !important;
+}

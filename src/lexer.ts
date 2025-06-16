@@ -10,7 +10,15 @@ import {
 	peek,
 } from "./utils";
 
-export const tokenize = (src: string): Token[] => {
+type ErrorType = {
+	line: number;
+	column: number;
+	message: string;
+};
+
+export const tokenize = (
+	src: string,
+): { tokens: Token[]; error: ErrorType | null } => {
 	const tokens: Token[] = [];
 	let pos = { line: 1, column: 1, current: 0 };
 
@@ -25,6 +33,11 @@ export const tokenize = (src: string): Token[] => {
 		Partial<Pick<Token, "line" | "column" | "start" | "end">>) => {
 		tokens.push({ type, value, line, column, start, end });
 	};
+	const errorReturn = (message: string): ErrorType => ({
+		line: pos.line,
+		column: pos.column,
+		message,
+	});
 
 	while (!isEndOfFile(peek(src, pos.current))) {
 		const ch = peek(src, pos.current);
@@ -65,9 +78,10 @@ export const tokenize = (src: string): Token[] => {
 					pos = advance(src, pos.current, pos.line, pos.column);
 				}
 				if (isEndOfFile(peek(src, pos.current))) {
-					throw new Error(
-						`Unterminated string literal at line ${pos.line}, column ${pos.column}`,
-					);
+					return {
+						tokens,
+						error: errorReturn("Unterminated string literal at line"),
+					};
 				}
 				// consume the closing quote
 				pos = advance(src, pos.current, pos.line, pos.column);
@@ -98,9 +112,10 @@ export const tokenize = (src: string): Token[] => {
 			case ":":
 			case "=": {
 				if (lookahead(src, pos.current, 1) !== "=") {
-					throw new Error(
-						`Unexpected character '${ch}' at line ${pos.line}, column ${pos.column}`,
-					);
+					return {
+						tokens,
+						error: errorReturn(`Unexpected character '${ch}'`),
+					};
 				}
 				// consume the second = character
 				pos = advance(src, pos.current, pos.line, pos.column);
@@ -141,9 +156,10 @@ export const tokenize = (src: string): Token[] => {
 					) {
 						const decimal = match(src, pos.current, ".");
 						if (decimal && !isDigit(lookahead(src, pos.current, 1))) {
-							throw new Error(
-								`Unexpected character '.' at line ${pos.line}, column ${pos.column}`,
-							);
+							return {
+								tokens,
+								error: errorReturn("Unexpected character '.' in number"),
+							};
 						}
 						value += peek(src, pos.current);
 						pos = advance(src, pos.current, pos.line, pos.column);
@@ -165,10 +181,11 @@ export const tokenize = (src: string): Token[] => {
 					break;
 				}
 
-				throw new Error(
-					`Unexpected character '${ch}' at line ${pos.line}, column ${pos.column}`,
-				);
+				return {
+					tokens,
+					error: errorReturn(`Unexpected character '${ch}'`),
+				};
 		}
 	}
-	return tokens;
+	return { tokens, error: null };
 };
