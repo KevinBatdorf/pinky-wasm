@@ -1,19 +1,40 @@
 import type { Token } from "../tokens";
-
+import { useEffect, useMemo, useState } from "react";
+import { tokenize } from "../lexer";
 type TokensType = {
-	tokens: Token[];
+	code: string;
 	handleTokenHover: (token: Token) => void;
 	handleTokenLeave: () => void;
+	setTokenPerf: (perf: number) => void;
 };
 
 export const Tokens = ({
-	tokens,
+	code,
 	handleTokenHover,
 	handleTokenLeave,
-}: TokensType) => (
-	<pre className="flex-shrink text-sm p-1 font-mono max-h-screen w-52 border-r border-gray-800 selection:bg-yellow-500 selection:text-black flex flex-col h-full">
-		<span className="">Tokens</span>
-		<div className="overflow-x-hidden overflow-y-auto flex-grow pb-60 ">
+	setTokenPerf,
+}: TokensType) => {
+	const { tokens, perf } = useMemo<{ tokens: Token[]; perf: number }>(() => {
+		try {
+			const now = performance.now();
+			const tokens = tokenize(code);
+			return { tokens, perf: performance.now() - now };
+		} catch (error) {
+			console.error("Error tokenizing code:", error);
+			// TODO: could the lexer handle errors?
+			// todo: highlght lines with errors?
+			return { tokens: [], perf: 0 };
+		}
+	}, [code]);
+
+	useEffect(() => {
+		setTokenPerf(perf);
+	}, [perf, setTokenPerf]);
+
+	if (!tokens.length) return null;
+
+	return (
+		<div className="flex-grow pb-60 ">
 			{tokens.map((token) => {
 				const { start, type, value } = token;
 				return (
@@ -29,5 +50,5 @@ export const Tokens = ({
 				);
 			})}
 		</div>
-	</pre>
-);
+	);
+};

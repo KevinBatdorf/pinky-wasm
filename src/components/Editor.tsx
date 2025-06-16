@@ -18,7 +18,7 @@ export const CodeEditor = (props: CodeEditorProps) => {
 	useEffect(() => {
 		createHighlighter({
 			langs: [pinkyGrammar],
-			themes: ["aurora-x"],
+			themes: ["material-theme-palenight"],
 		}).then(setHighlighter);
 	}, []);
 
@@ -29,7 +29,7 @@ export const CodeEditor = (props: CodeEditorProps) => {
 			<Editor
 				autoFocus
 				value={value}
-				className="h-screen font-jetbrains-mono"
+				className="font-jetbrains-mono"
 				onValueChange={onChange}
 				{...remainingProps}
 				padding={16}
@@ -43,8 +43,8 @@ export const CodeEditor = (props: CodeEditorProps) => {
 				highlight={(code: string) =>
 					highlighter
 						.codeToHtml(code, {
-							lang: "Pinky",
-							theme: "aurora-x",
+							lang: "pinky",
+							theme: "material-theme-palenight",
 							decorations: token
 								? [
 										{
