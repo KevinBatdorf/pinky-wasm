@@ -194,5 +194,6 @@ export const tokenize = (
 				};
 		}
 	}
+	addToken({ type: "EOF", value: "" });
 	return { tokens, error: null };
 };

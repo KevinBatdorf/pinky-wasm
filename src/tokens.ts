@@ -1,4 +1,4 @@
-type TokenType =
+export type TokenType =
 	| "LPAREN"
 	| "RPAREN"
 	| "COMMA"
@@ -36,7 +36,8 @@ type TokenType =
 	| "PRINT"
 	| "PRINTLN"
 	| "RET"
-	| "LOCAL";
+	| "LOCAL"
+	| "EOF";
 
 export interface Token {
 	type: TokenType;

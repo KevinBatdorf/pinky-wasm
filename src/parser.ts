@@ -1,26 +1,45 @@
 import type { Program, Statement } from "./syntax";
-import type { Token } from "./tokens";
+import type { Token, TokenType } from "./tokens";
 
-export const parse = (tokens: Token[]): Program => {
-	const lastToken = tokens.at(-1);
-	return {
-		type: "Program",
-		body: statements(tokens),
-		loc: {
-			start: { line: 1, column: 1 },
-			end: {
-				line: lastToken?.line || 1,
-				column: lastToken?.value
-					? // Count the length of the last token's value
-						lastToken.column + lastToken.value.length - 1
-					: lastToken?.column || 1,
-			},
-		},
-	};
+type ParserState = { tokens: Token[]; current: number };
+
+const peek = ({ tokens, current }: ParserState): Token => tokens[current];
+const advance = (state: ParserState): Token => {
+	const token = state.tokens[state.current];
+	if (!isEOF(token)) state.current++; // mutate in place
+	return token;
+};
+const isEOF = (token: Token | null): boolean => token?.type === "EOF";
+const previous = (state: ParserState): Token | null => {
+	const { tokens, current } = state;
+	return current > 0 ? tokens[current - 1] : null;
+};
+const isNextToken = (state: ParserState, type: TokenType): boolean => {
+	const { tokens, current } = state;
+	return !isEOF(tokens[current]) && tokens[current].type === type;
+};
+const expectNext = (state: ParserState, type: TokenType): Token => {
+	if (isNextToken(state, type)) return advance(state);
+	const { tokens, current } = state;
+	throw new Error(
+		`Expected token type ${type} but found ${tokens[current]?.type}`,
+	);
 };
 
-const statements = (tokens: Token[]): Statement[] => {
+export const parse = (tokens: Token[]): Program => ({
+	type: "Program",
+	body: parseStatements({ tokens, current: 0 }),
+	loc: {
+		start: { line: 1, column: 1 },
+		end: {
+			line: tokens?.at(-1)?.line || 1,
+			column: tokens?.at(-1)?.column || 1,
+		},
+	},
+});
+
+const parseStatements = ({ tokens, current }: ParserState): Statement[] => {
 	//
-	console.log(tokens);
+	console.log(tokens, current);
 	return [];
 };

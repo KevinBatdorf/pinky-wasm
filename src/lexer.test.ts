@@ -15,6 +15,7 @@ test("should tokenize all punctuation and symbol tokens", () => {
 		{ type: "SLASH", value: "/", start: 7, end: 8, column: 8, line: 1 },
 		{ type: "CARET", value: "^", start: 8, end: 9, column: 9, line: 1 },
 		{ type: "MOD", value: "%", start: 9, end: 10, column: 10, line: 1 },
+		{ type: "EOF", value: "", start: 10, end: 10, column: 11, line: 1 },
 	];
 	expect(tokens).toEqual(expected);
 });
@@ -25,6 +26,7 @@ test("should tokenize variable assignment and numbers", () => {
 		{ type: "IDENTIFIER", value: "x", start: 0, end: 1, column: 1, line: 1 },
 		{ type: "ASSIGN", value: ":=", start: 2, end: 4, column: 3, line: 1 },
 		{ type: "NUMBER", value: "42", start: 5, end: 7, column: 6, line: 1 },
+		{ type: "EOF", value: "", start: 7, end: 7, column: 8, line: 1 },
 	]);
 });
 
@@ -37,6 +39,7 @@ test("should tokenize arithmetic and floats", () => {
 		{ type: "IDENTIFIER", value: "x", start: 5, end: 6, column: 6, line: 1 },
 		{ type: "PLUS", value: "+", start: 7, end: 8, column: 8, line: 1 },
 		{ type: "NUMBER", value: "3.14", start: 9, end: 13, column: 10, line: 1 },
+		{ type: "EOF", value: "", start: 13, end: 13, column: 14, line: 1 },
 	]);
 });
 
@@ -54,6 +57,7 @@ test("should tokenize string assignment", () => {
 		},
 		{ type: "ASSIGN", value: ":=", start: 5, end: 7, column: 6, line: 1 },
 		{ type: "STRING", value: "Pinky", start: 8, end: 15, column: 9, line: 1 },
+		{ type: "EOF", value: "", start: 15, end: 15, column: 16, line: 1 },
 	]);
 });
 
@@ -85,6 +89,7 @@ test("should tokenize if statement", () => {
 		},
 		{ type: "RPAREN", value: ")", start: 30, end: 31, column: 31, line: 1 },
 		{ type: "END", value: "end", start: 32, end: 35, column: 33, line: 1 },
+		{ type: "EOF", value: "", start: 35, end: 35, column: 36, line: 1 },
 	]);
 });
 
@@ -117,6 +122,7 @@ test("should tokenize while loop", () => {
 		{ type: "PLUS", value: "+", start: 23, end: 24, column: 24, line: 1 },
 		{ type: "NUMBER", value: "1", start: 25, end: 26, column: 26, line: 1 },
 		{ type: "END", value: "end", start: 27, end: 30, column: 28, line: 1 },
+		{ type: "EOF", value: "", start: 30, end: 30, column: 31, line: 1 },
 	]);
 });
 
@@ -194,6 +200,7 @@ test("should tokenize function definition and call", () => {
 		{ type: "COMMA", value: ",", start: 47, end: 48, column: 16, line: 2 },
 		{ type: "NUMBER", value: "3", start: 49, end: 50, column: 18, line: 2 },
 		{ type: "RPAREN", value: ")", start: 50, end: 51, column: 19, line: 2 },
+		{ type: "EOF", value: "", start: 51, end: 51, column: 20, line: 2 },
 	]);
 });
 
@@ -227,6 +234,7 @@ end`;
 		{ type: "RPAREN", value: ")", start: 47, end: 48, column: 13, line: 3 },
 		{ type: "END", value: "end", start: 50, end: 53, column: 2, line: 4 },
 		{ type: "END", value: "end", start: 54, end: 57, column: 1, line: 5 },
+		{ type: "EOF", value: "", start: 57, end: 57, column: 4, line: 5 },
 	]);
 });
 
@@ -240,6 +248,7 @@ test("should tokenize single-character comparison operators", () => {
 		{ type: "IDENTIFIER", value: "y", start: 6, end: 7, column: 7, line: 1 },
 		{ type: "LT", value: "<", start: 8, end: 9, column: 9, line: 1 },
 		{ type: "NUMBER", value: "2", start: 10, end: 11, column: 11, line: 1 },
+		{ type: "EOF", value: "", start: 11, end: 11, column: 12, line: 1 },
 	]);
 });
 
@@ -269,6 +278,7 @@ test("should tokenize >= and <=", () => {
 		{ type: "IDENTIFIER", value: "b", start: 8, end: 9, column: 9, line: 1 },
 		{ type: "LE", value: "<=", start: 10, end: 12, column: 11, line: 1 },
 		{ type: "NUMBER", value: "20", start: 13, end: 15, column: 14, line: 1 },
+		{ type: "EOF", value: "", start: 15, end: 15, column: 16, line: 1 },
 	]);
 });
 
