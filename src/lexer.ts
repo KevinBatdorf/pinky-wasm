@@ -33,10 +33,13 @@ export const tokenize = (
 		Partial<Pick<Token, "line" | "column" | "start" | "end">>) => {
 		tokens.push({ type, value, line, column, start, end });
 	};
-	const errorReturn = (message: string): ErrorType => ({
-		line: pos.line,
-		column: pos.column,
+	const errorReturn = (
+		message: string,
+		details?: { line?: number; column?: number },
+	): ErrorType => ({
 		message,
+		line: details?.line || pos.line,
+		column: details?.column || pos.column,
 	});
 
 	while (!isEndOfFile(peek(src, pos.current))) {
@@ -67,6 +70,7 @@ export const tokenize = (
 			case "'":
 			case '"': {
 				let value = "";
+				const quotePos = pos; // track for error handling
 				// consume the opening quote
 				pos = advance(src, pos.current, pos.line, pos.column);
 				while (
@@ -80,7 +84,10 @@ export const tokenize = (
 				if (isEndOfFile(peek(src, pos.current))) {
 					return {
 						tokens,
-						error: errorReturn("Unterminated string literal at line"),
+						error: errorReturn("Unterminated string literal at line", {
+							line: quotePos.line,
+							column: quotePos.column,
+						}),
 					};
 				}
 				// consume the closing quote
