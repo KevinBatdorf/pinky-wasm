@@ -20,6 +20,7 @@ function App() {
 	}>(() => {
 		const now = performance.now();
 		const { tokens, error } = tokenize(code);
+		console.log({ tokens, error });
 		return { tokens, perf: performance.now() - now, error };
 	}, [code]);
 

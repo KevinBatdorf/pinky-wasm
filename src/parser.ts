@@ -1,8 +1,8 @@
-import type { Program } from "./syntax";
+import type { Program, Statement } from "./syntax";
 import type { Token } from "./tokens";
 
 export const parse = (tokens: Token[]): Program => {
-	const lastToken = tokens[tokens.length - 1];
+	const lastToken = tokens.at(-1);
 	return {
 		type: "Program",
 		body: statements(tokens),
@@ -19,4 +19,8 @@ export const parse = (tokens: Token[]): Program => {
 	};
 };
 
-const statements = (tokens: Token[]) => [];
+const statements = (tokens: Token[]): Statement[] => {
+	//
+	console.log(tokens);
+	return [];
+};
