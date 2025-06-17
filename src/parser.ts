@@ -40,6 +40,6 @@ export const parse = (tokens: Token[]): Program => ({
 
 const parseStatements = ({ tokens, current }: ParserState): Statement[] => {
 	//
-	console.log(tokens, current);
+	console.log(tokens, current, peek, previous, expectNext);
 	return [];
 };
