@@ -46,7 +46,19 @@ function App() {
 	}, [tokens]);
 
 	const handleHover = (loc: Location) => {
-		setHoveredToken((prev) => (loc === prev ? null : loc));
+		setHoveredToken((prev) => {
+			const { start, end } = loc;
+			if (
+				!prev ||
+				prev.start.line !== start.line ||
+				prev.start.column !== start.column ||
+				prev.end.line !== end.line ||
+				prev.end.column !== end.column
+			) {
+				return loc;
+			}
+			return prev;
+		});
 	};
 	const handleLeave = () => {
 		setHoveredToken(null);
