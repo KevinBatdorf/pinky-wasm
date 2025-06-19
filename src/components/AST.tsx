@@ -24,7 +24,7 @@ export const ASTComponent = ({
 	const randomId = Math.random().toString(36).substring(2, 15);
 
 	return (
-		<div className="flex-grow pb-60 cursor-default">
+		<div className="flex-grow pb-60 cursor-default flex flex-col gap-1.5">
 			{ast.body.map((statement, index) => (
 				<StatementDisplay
 					handleLeave={handleLeave}
@@ -68,9 +68,12 @@ const StatementDisplay = ({
 		case "PrintlnStatement":
 		case "ExpressionStatement":
 			return (
-				<div style={{ paddingLeft: `${indent * 8}px` }}>
+				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
-						onMouseEnter={() => handleHover(statement.loc)}
+						onMouseEnter={(e) => {
+							e.stopPropagation();
+							handleHover(statement.loc);
+						}}
 						onMouseLeave={handleLeave}
 						className={getColor(indent)}
 					>
@@ -86,10 +89,13 @@ const StatementDisplay = ({
 			);
 		case "AssignStatement":
 			return (
-				<div style={{ paddingLeft: `${indent * 8}px` }}>
+				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
 						className={getColor(indent)}
-						onMouseEnter={() => handleHover(statement.loc)}
+						onMouseEnter={(e) => {
+							e.stopPropagation();
+							handleHover(statement.loc);
+						}}
 						onMouseLeave={handleLeave}
 					>
 						{statement.type}
@@ -112,15 +118,18 @@ const StatementDisplay = ({
 			);
 		case "IfStatement":
 			return (
-				<div style={{ paddingLeft: `${indent * 8}px` }}>
+				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
 						className={getColor(indent)}
-						onMouseEnter={() => handleHover(statement.loc)}
+						onMouseEnter={(e) => {
+							e.stopPropagation();
+							handleHover(statement.loc);
+						}}
 						onMouseLeave={handleLeave}
 					>
 						{statement.type}
 					</div>
-					<div style={{ paddingLeft: `${(indent + 1) * 8}px` }}>
+					<div style={{ marginLeft: `${(indent + 1) * 8}px` }}>
 						<div className={getColor(indent)}>Condition:</div>
 						<ExpressionDisplay
 							expression={statement.condition}
@@ -182,15 +191,18 @@ const StatementDisplay = ({
 			);
 		case "WhileStatement":
 			return (
-				<div style={{ paddingLeft: `${indent * 8}px` }}>
+				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
 						className={getColor(indent)}
-						onMouseEnter={() => handleHover(statement.loc)}
+						onMouseEnter={(e) => {
+							e.stopPropagation();
+							handleHover(statement.loc);
+						}}
 						onMouseLeave={handleLeave}
 					>
 						{statement.type}
 					</div>
-					<div style={{ paddingLeft: `${(indent + 1) * 8}px` }}>
+					<div style={{ marginLeft: `${(indent + 1) * 8}px` }}>
 						<div className={getColor(indent)}>Condition:</div>
 						<ExpressionDisplay
 							expression={statement.condition}
@@ -213,15 +225,18 @@ const StatementDisplay = ({
 			);
 		case "ForStatement":
 			return (
-				<div style={{ paddingLeft: `${indent * 8}px` }}>
+				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
 						className={getColor(indent)}
-						onMouseEnter={() => handleHover(statement.loc)}
+						onMouseEnter={(e) => {
+							e.stopPropagation();
+							handleHover(statement.loc);
+						}}
 						onMouseLeave={handleLeave}
 					>
 						{statement.type}
 					</div>
-					<div style={{ paddingLeft: `${(indent + 1) * 8}px` }}>
+					<div style={{ marginLeft: `${(indent + 1) * 8}px` }}>
 						<StatementDisplay
 							statement={statement.assignment}
 							indent={indent}
@@ -261,15 +276,18 @@ const StatementDisplay = ({
 			);
 		case "FunctionDeclStatement":
 			return (
-				<div style={{ paddingLeft: `${indent * 8}px` }}>
+				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
 						className={getColor(indent)}
-						onMouseEnter={() => handleHover(statement.loc)}
+						onMouseEnter={(e) => {
+							e.stopPropagation();
+							handleHover(statement.loc);
+						}}
 						onMouseLeave={handleLeave}
 					>
 						{statement.type}
 					</div>
-					<div style={{ paddingLeft: `${(indent + 1) * 8}px` }}>
+					<div style={{ marginLeft: `${(indent + 1) * 8}px` }}>
 						<div className={getColor(indent)}>Name:</div>
 						<ExpressionDisplay
 							expression={statement.name}
@@ -306,10 +324,13 @@ const StatementDisplay = ({
 			);
 		case "ReturnStatement":
 			return (
-				<div style={{ paddingLeft: `${indent * 8}px` }}>
+				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
 						className={getColor(indent)}
-						onMouseEnter={() => handleHover(statement.loc)}
+						onMouseEnter={(e) => {
+							e.stopPropagation();
+							handleHover(statement.loc);
+						}}
 						onMouseLeave={handleLeave}
 					>
 						{statement.type}
@@ -324,10 +345,13 @@ const StatementDisplay = ({
 			);
 		case "LocalAssignStatement":
 			return (
-				<div style={{ paddingLeft: `${indent * 8}px` }}>
+				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
 						className={getColor(indent)}
-						onMouseEnter={() => handleHover(statement.loc)}
+						onMouseEnter={(e) => {
+							e.stopPropagation();
+							handleHover(statement.loc);
+						}}
 						onMouseLeave={handleLeave}
 					>
 						{statement.type}
@@ -367,12 +391,12 @@ const ExpressionDisplay = ({
 		case "StringLiteral":
 			return (
 				<div
-					style={{ paddingLeft: `${indent * 8}px` }}
+					style={{ marginLeft: `${indent * 8}px` }}
 					onMouseEnter={() => handleHover(expression.loc)}
 					onMouseLeave={handleLeave}
 				>
 					<div className={getColor(indent)}>{expression.type}</div>
-					<div style={{ paddingLeft: `${indent * 8}px` }} className="">
+					<div style={{ marginLeft: `${indent * 8}px` }} className="">
 						<span className="text-[#A6DA95]">"{expression.value}"</span>
 					</div>
 				</div>
@@ -380,12 +404,12 @@ const ExpressionDisplay = ({
 		case "NumberLiteral":
 			return (
 				<div
-					style={{ paddingLeft: `${indent * 8}px` }}
+					style={{ marginLeft: `${indent * 8}px` }}
 					onMouseEnter={() => handleHover(expression.loc)}
 					onMouseLeave={handleLeave}
 				>
 					<div className={getColor(indent)}>{expression.type}</div>
-					<div style={{ paddingLeft: `${indent * 8}px` }} className="">
+					<div style={{ marginLeft: `${indent * 8}px` }} className="">
 						<span className="text-[#F5A97F]">{String(expression.value)}</span>
 					</div>
 				</div>
@@ -393,19 +417,19 @@ const ExpressionDisplay = ({
 		case "BooleanLiteral":
 			return (
 				<div
-					style={{ paddingLeft: `${indent * 8}px` }}
+					style={{ marginLeft: `${indent * 8}px` }}
 					onMouseEnter={() => handleHover(expression.loc)}
 					onMouseLeave={handleLeave}
 				>
 					<div className={getColor(indent)}>{expression.type}</div>
-					<div style={{ paddingLeft: `${indent * 8}px` }} className="">
+					<div style={{ marginLeft: `${indent * 8}px` }} className="">
 						<span className="text-[#ED8796]">{String(expression.value)}</span>
 					</div>
 				</div>
 			);
 		case "FunctionCallExpression":
 			return (
-				<div style={{ paddingLeft: `${indent * 8}px` }}>
+				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div>
 						<div
 							className={getColor(indent)}
@@ -421,7 +445,7 @@ const ExpressionDisplay = ({
 							handleLeave={handleLeave}
 						/>
 					</div>
-					<div style={{ paddingLeft: `${indent * 8}px` }} className="">
+					<div style={{ marginLeft: `${indent * 8}px` }} className="">
 						{expression.args.length ? (
 							<div className={getColor(indent)}>Args:</div>
 						) : null}
@@ -439,7 +463,7 @@ const ExpressionDisplay = ({
 			);
 		case "BinaryExpression":
 			return (
-				<div style={{ paddingLeft: `${indent * 8}px` }}>
+				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div>
 						<div
 							className={getColor(indent)}
@@ -469,7 +493,7 @@ const ExpressionDisplay = ({
 			);
 		case "UnaryExpression":
 			return (
-				<div style={{ paddingLeft: `${indent * 8}px` }}>
+				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
 						className={getColor(indent)}
 						onMouseEnter={() => handleHover(expression.loc)}
@@ -477,7 +501,7 @@ const ExpressionDisplay = ({
 					>
 						{expression.type}
 					</div>
-					<div style={{ paddingLeft: `${indent * 8}px` }} className="">
+					<div style={{ marginLeft: `${indent * 8}px` }} className="">
 						<span className={getColor(indent)}>op:</span>
 						<span className="text-[#8BD5CA]"> {expression.operator}</span>
 					</div>
@@ -492,13 +516,13 @@ const ExpressionDisplay = ({
 		case "Identifier":
 			return (
 				<div
-					style={{ paddingLeft: `${indent * 8}px` }}
+					style={{ marginLeft: `${indent * 8}px` }}
 					onMouseEnter={() => handleHover(expression.loc)}
 					onMouseLeave={handleLeave}
 				>
 					<div className={getColor(indent)}>{expression.type}</div>
 					<div
-						style={{ paddingLeft: `${indent * 8}px` }}
+						style={{ marginLeft: `${indent * 8}px` }}
 						className="text-[#CAD3F5]"
 					>
 						{expression.name}
@@ -507,7 +531,7 @@ const ExpressionDisplay = ({
 			);
 		case "GroupingExpression":
 			return (
-				<div style={{ paddingLeft: `${indent * 8}px` }}>
+				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
 						className={getColor(indent)}
 						onMouseEnter={() => handleHover(expression.loc)}

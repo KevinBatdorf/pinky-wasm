@@ -53,9 +53,9 @@ function App() {
 	};
 
 	return (
-		<div className="flex justify-between max-h-screen overflow-hidden">
+		<div className="flex justify-between h-screen overflow-hidden">
 			<div className="text-sm p-1 max-h-screen w-52 border-r border-gray-800 flex flex-col overflow-hidden h-screen flex-shrink-0">
-				<div className="flex items-center justify-between">
+				<div className="flex items-center justify-between bg-black">
 					<span className="">Tokens</span>
 					<span className="text-xs text-gray-500">
 						({tokenPerf.toFixed(2)}ms)
@@ -71,7 +71,7 @@ function App() {
 				</pre>
 			</div>
 			<div className="flex-grow border-r border-gray-800 p-1 overflow-hidden h-screen flex flex-col min-w-96">
-				<div className="flex items-center justify-between text-sm">
+				<div className="flex items-center justify-between text-sm bg-black">
 					<a
 						href="https://pinky-lang.org/"
 						target="_blank"
@@ -97,13 +97,13 @@ function App() {
 				/>
 			</div>
 			<div className="text-sm border-r border-gray-800 p-1 w-56 h-screen overflow-hidden flex flex-col flex-shrink-0">
-				<div className="flex items-center justify-between text-sm">
+				<div className="flex items-center justify-between text-sm bg-black">
 					<span>AST</span>
 					<span className="text-xs text-gray-500">
 						({astPerf.toFixed(2)}ms)
 					</span>
 				</div>
-				<div className="selection:bg-blue-500 selection:text-black overflow-x-auto overflow-y-auto">
+				<div className="selection:bg-blue-500 selection:text-black overflow-x-auto overflow-y-auto h-screen">
 					{ast && (
 						<ASTComponent
 							ast={ast}
@@ -115,13 +115,13 @@ function App() {
 				</div>
 			</div>
 			<div className="text-sm p-1 w-56 border-r border-gray-800 flex-shrink-0">
-				<div className="flex items-center justify-between text-sm">
+				<div className="flex items-center justify-between text-sm bg-black">
 					<span>wasm bytecode</span>
 					<span className="text-xs text-gray-500">(coming soon)</span>
 				</div>
 			</div>
 			<div className="text-sm p-1 w-56 flex-shrink-0">
-				<div className="flex items-center justify-between text-sm">
+				<div className="flex items-center justify-between text-sm bg-black">
 					<span>output</span>
 					<span className="text-xs text-gray-500">(coming soon)</span>
 				</div>
