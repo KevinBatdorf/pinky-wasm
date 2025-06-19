@@ -48,7 +48,7 @@
       "patterns": [
         {
           "name": "keyword.control",
-          "match": "\\b(if|then|else|while|do|for|end|ret)\\b"
+          "match": "\\b(if|then|else|elif|while|do|for|end|ret)\\b"
         },
         {
           "name": "storage.type.function",

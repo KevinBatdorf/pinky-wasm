@@ -1,24 +1,56 @@
 import { type Token, keywords, tokenTypes } from "./tokens";
-import {
-	advance,
-	isAlpha,
-	isAlphaNumeric,
-	isDigit,
-	isEndOfFile,
-	lookahead,
-	match,
-	peek,
-} from "./utils";
 
-type ErrorType = {
+export type TokenErrorType = null | {
 	line: number;
 	column: number;
 	message: string;
 };
 
+export const isAlpha = (char: string): boolean =>
+	(char >= "a" && char <= "z") || (char >= "A" && char <= "Z") || char === "_";
+export const isDigit = (char: string): boolean => char >= "0" && char <= "9";
+export const isAlphaNumeric = (char: string): boolean =>
+	isAlpha(char) || isDigit(char);
+export const isWhitespace = (char: string): boolean =>
+	char === " " || char === "\t" || char === "\r";
+export const isNewline = (char: string): boolean => char === "\n";
+export const isEndOfFile = (char: string): boolean => char === "\0";
+
+export const peek = (source: string, curr: number): string =>
+	curr < source.length ? source[curr] : "\0";
+export const lookahead = (source: string, curr: number, n: number): string =>
+	curr + n < source.length ? source[curr + n] : "\0";
+export const match = (source: string, curr: number, char: string): boolean =>
+	peek(source, curr) === char;
+export const advance = (
+	source: string,
+	curr: number,
+	line: number,
+	column: number,
+): {
+	line: number;
+	column: number;
+	current: number;
+} => {
+	const char = peek(source, curr);
+	let nextLine = line;
+	let nextColumn = column;
+	if (isNewline(char)) {
+		nextLine++;
+		nextColumn = 1;
+	} else {
+		nextColumn++;
+	}
+	return {
+		line: nextLine,
+		column: nextColumn,
+		current: curr + 1,
+	};
+};
+
 export const tokenize = (
 	src: string,
-): { tokens: Token[]; error: ErrorType | null } => {
+): { tokens: Token[]; error: TokenErrorType | null } => {
 	const tokens: Token[] = [];
 	let pos = { line: 1, column: 1, current: 0 };
 
@@ -36,7 +68,7 @@ export const tokenize = (
 	const errorReturn = (
 		message: string,
 		details?: { line?: number; column?: number },
-	): ErrorType => ({
+	): TokenErrorType => ({
 		message,
 		line: details?.line || pos.line,
 		column: details?.column || pos.column,
@@ -82,6 +114,7 @@ export const tokenize = (
 					pos = advance(src, pos.current, pos.line, pos.column);
 				}
 				if (isEndOfFile(peek(src, pos.current))) {
+					addToken({ type: "EOF", value: "" });
 					return {
 						tokens,
 						error: errorReturn("Unterminated string literal at line", {
@@ -118,7 +151,14 @@ export const tokenize = (
 			case "~":
 			case ":":
 			case "=": {
+				// Handle unary operator ~
+				if (ch === "~" && lookahead(src, pos.current, 1) !== "=") {
+					pos = advance(src, pos.current, pos.line, pos.column);
+					addToken({ type: tokenTypes[ch], value: ch, start, column });
+					break;
+				}
 				if (lookahead(src, pos.current, 1) !== "=") {
+					addToken({ type: "EOF", value: "" });
 					return {
 						tokens,
 						error: errorReturn(`Unexpected character '${ch}'`),
@@ -163,6 +203,7 @@ export const tokenize = (
 					) {
 						const decimal = match(src, pos.current, ".");
 						if (decimal && !isDigit(lookahead(src, pos.current, 1))) {
+							addToken({ type: "EOF", value: "" });
 							return {
 								tokens,
 								error: errorReturn("Unexpected character '.' in number"),
@@ -188,6 +229,7 @@ export const tokenize = (
 					break;
 				}
 
+				addToken({ type: "EOF", value: "" });
 				return {
 					tokens,
 					error: errorReturn(`Unexpected character '${ch}'`),

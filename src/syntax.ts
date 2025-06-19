@@ -2,13 +2,19 @@ type Position = {
 	line: number;
 	column: number;
 };
-type Location = {
+export type Location = {
 	start: Position;
 	end: Position;
 };
 
 export type Node = {
 	type: string;
+	loc: Location;
+};
+
+export type ErrorNode = {
+	type: "ErrorNode";
+	message: string;
 	loc: Location;
 };
 
@@ -21,7 +27,7 @@ export type Statement =
 	| IfStatement
 	| WhileStatement
 	| ForStatement
-	| FunctionDeclarationStatement
+	| FunctionDeclStatement
 	| ReturnStatement;
 
 export type Expression =
@@ -32,57 +38,60 @@ export type Expression =
 	| FunctionCallExpression
 	| GroupingExpression;
 
-type BinaryOperator =
-	| "+"
-	| "-"
-	| "*"
-	| "/"
-	| "%"
-	| "^"
-	| "=="
-	| "~="
-	| ">"
-	| ">="
-	| "<"
-	| "<="
-	| "and"
-	| "or";
+export const BINARY_OPERATORS = [
+	"+",
+	"-",
+	"*",
+	"/",
+	"%",
+	"^",
+	"==",
+	"~=",
+	">",
+	">=",
+	"<",
+	"<=",
+	"and",
+	"or",
+] as const;
+export type BinaryOperator = (typeof BINARY_OPERATORS)[number];
 
-type UnaryOperator = "-" | "+" | "~";
+export const UNARY_OPERATORS = ["+", "-", "~"] as const;
+export type UnaryOperator = (typeof UNARY_OPERATORS)[number];
 
-// <program> ::= <stmts>
+/** <program> ::= <stmts> */
 export type Program = Node & {
 	type: "Program";
 	body: Statement[];
 };
 
-// <expr_stmt> ::= <expr>
+/** <expr_stmt> ::= <expr> */
 export type ExpressionStatement = Node & {
 	type: "ExpressionStatement";
 	expression: Expression;
 };
 
-// <assign> ::= <identifier> "=" <expr>
+/** <assign> ::= <identifier> "=" <expr> */
 export type AssignStatement = Node & {
 	type: "AssignStatement";
 	identifier: Identifier;
 	expression: Expression;
 };
 
-// <local_assign> ::= "local" <assign>
+/** <local_assign> ::= "local" <assign> */
 export type LocalAssignStatement = Node & {
 	type: "LocalAssignStatement";
 	identifier: Identifier;
 	expression: Expression;
 };
 
-// <print_stmt> ::= "print" <expr>
+/** <print_stmt> ::= "print" <expr> */
 export type PrintStatement = Node & {
 	type: "PrintStatement";
 	expression: Expression;
 };
 
-// <println_stmt> ::= "println" <expr>
+/** <println_stmt> ::= "println" <expr> */
 export type PrintlnStatement = Node & {
 	type: "PrintlnStatement";
 	expression: Expression;
@@ -102,14 +111,14 @@ export type IfStatement = Node & {
 	elseBranch?: Statement[];
 };
 
-// <while_stmt> ::= "while" <expr> "do" <stmts> "end"
+/** <while_stmt> ::= "while" <expr> "do" <stmts> "end" */
 export type WhileStatement = Node & {
 	type: "WhileStatement";
 	condition: Expression;
 	body: Statement[];
 };
 
-// <for_stmt> ::= "for" <assign> "," <expr> ( "," <expr>)? "do" <stmts> "end"
+/** <for_stmt> ::= "for" <assign> "," <expr> ( "," <expr>)? "do" <stmts> "end" */
 export type ForStatement = Node & {
 	type: "ForStatement";
 	assignment: AssignStatement;
@@ -118,28 +127,28 @@ export type ForStatement = Node & {
 	body: Statement[];
 };
 
-// <func_decl> ::= "func" <func_name> "(" [<identifier> ("," <identifier>)*] ")" "do" <stmts> "end"
-export type FunctionDeclarationStatement = Node & {
-	type: "FunctionDeclarationStatement";
+/** <func_decl> ::= "func" <func_name> "(" [<identifier> ("," <identifier>)*] ")" "do" <stmts> "end"  */
+export type FunctionDeclStatement = Node & {
+	type: "FunctionDeclStatement";
 	name: Identifier;
 	params: Identifier[];
 	body: Statement[];
 };
 
-// <func_call> ::= <func_name> "(" <args>? ")"
+/** <func_call> ::= <func_name> "(" <args>? ")" */
 export type FunctionCallExpression = Node & {
 	type: "FunctionCallExpression";
 	name: Identifier;
 	args: Expression[];
 };
 
-// <ret_stmt> ::= "ret" <expr>
+/** <ret_stmt> ::= "ret" <expr> */
 export type ReturnStatement = Node & {
 	type: "ReturnStatement";
 	expression: Expression;
 };
 
-// <binary_expr> ::= <expr> <operator> <expr>
+/** <binary_expr> ::= <expr> <operator> <expr> */
 export type BinaryExpression = Node & {
 	type: "BinaryExpression";
 	operator: BinaryOperator;
@@ -147,41 +156,41 @@ export type BinaryExpression = Node & {
 	right: Expression;
 };
 
-// <unary_expr> ::= <operator> <expr>
+/** <unary_expr> ::= <operator> <expr> */
 export type UnaryExpression = Node & {
 	type: "UnaryExpression";
 	operator: UnaryOperator;
 	argument: Expression;
 };
 
-// <literal> ::= <bool> | <integer> | "<float>" | "string"
+/** <literal> ::= <bool> | <integer> | "<float>" | "string" */
 export type Literal = NumberLiteral | StringLiteral | BooleanLiteral;
 
-// <number> ::= <integer> | <float>
+/** <number> ::= <integer> | <float> */
 export type NumberLiteral = Node & {
 	type: "NumberLiteral";
 	value: number;
 };
 
-// <string> ::= '"' <string_content>? '"' | "'" <string_content>? "'"
+/** <string> ::= '"' <string_content>? '"' | "'" <string_content>? "'" */
 export type StringLiteral = Node & {
 	type: "StringLiteral";
 	value: string;
 };
 
-// <bool> ::= "true" | "false"
+/** <bool> ::= "true" | "false" */
 export type BooleanLiteral = Node & {
 	type: "BooleanLiteral";
 	value: boolean;
 };
 
-// <identifier> ::= <alpha> <alnum>*
+/** <identifier> ::= <alpha> <alnum>* */
 export type Identifier = Node & {
 	type: "Identifier";
 	name: string;
 };
 
-// <grouping> ::= "(" <expr> ")"
+/** <grouping> ::= "(" <expr> ")" */
 export type GroupingExpression = Node & {
 	type: "GroupingExpression";
 	expression: Expression;

@@ -1,41 +1,55 @@
-export const example = `x := 0
-pi := 3.141592
-name := 'Pinky'
+export const example = `x := 3
+y := 2 * (x + 4)
+z := y - x / 2
 
------------------------------------------------
--- Find the max value between two numbers
------------------------------------------------
-func max(a, b)
-if a > b then
-    ret a
-end
-    ret b
+func add(a, b)
+  ret a + b
 end
 
------------------------------------------------
--- Compute the factorial of a number
------------------------------------------------
-func factorial(n)
-    if n <= 1 then
-        ret 1
-    else
-        ret n * factorial(n - 1)
-    end
+result := add(x, y)
+println("add(x, y) = " + result)
+
+
+func outer()
+  func inner()
+    println("Inside inner")
+  end
+  inner()
+  println("Inside outer")
+end
+outer()
+
+
+if x > 5 then
+  println("x is greater than 5")
+elif x == 5 then
+  println("x is exactly 5")
+else
+  println("x is less than 5")
 end
 
------------------------------------------------
--- Start procedure
------------------------------------------------
-func main(a, b)
-    i := 0
-    while i <= 10 do
-        print(i)
-        i := i + 1
-    end
-    for i := 1, 10 do
-        print(factorial(i))
-    end
+-- While loop with inline print (comma-separated)
+i := 1
+print("Counting: ")
+while i <= 5 do
+  print(i)
+  if i < 5 then
+    print(", ")
+  else
+    println("")  -- newline at end
+  end
+  i := i + 1
 end
 
-main()
+
+for j := 1, j <= 3, j + 1 do
+  println("For loop: " + j)
+end
+
+
+flag := not false and true
+println("flag is: " + flag)
+
+
+add(10, 20)
 `;

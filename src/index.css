@@ -23,6 +23,5 @@ input:focus-visible {
 	}
 }
 .error-token {
-	background: #ff0000 !important;
-	color: white !important;
+	@apply decoration-wavy decoration-red-500 underline;
 }

@@ -1,17 +1,19 @@
 import { useEffect, useRef } from "react";
 import type { Token } from "../tokens";
+import type { TokenErrorType } from "../lexer";
+import type { Location } from "../syntax";
 type TokensType = {
 	tokens: Token[];
-	error?: { line: number; column: number; message: string } | null;
-	handleTokenHover: (token: Token) => void;
-	handleTokenLeave: () => void;
+	error?: TokenErrorType;
+	handleHover: (token: Location) => void;
+	handleLeave: () => void;
 };
 
-export const Tokens = ({
+export const TokensComponent = ({
 	tokens,
 	error,
-	handleTokenHover,
-	handleTokenLeave,
+	handleHover,
+	handleLeave,
 }: TokensType) => {
 	const errorRef = useRef<HTMLDivElement>(null);
 
@@ -25,13 +27,23 @@ export const Tokens = ({
 	return (
 		<div className="flex-grow pb-60 ">
 			{tokens.map((token) => {
-				const { start, type, value } = token;
+				const { line, column, start, type, value } = token;
 				return (
 					<div
 						key={start}
-						onMouseEnter={() => handleTokenHover(token)}
-						onMouseLeave={handleTokenLeave}
-						className="w-full text-left grid grid-cols-2 gap-2 "
+						onMouseEnter={() => {
+							if (type === "EOF") return;
+							handleHover({
+								start: { line, column },
+								end: {
+									line,
+									column:
+										value.length + column + 1 + (type === "STRING" ? 1 : -1),
+								},
+							});
+						}}
+						onMouseLeave={handleLeave}
+						className="w-full text-left grid grid-cols-2 gap-2 cursor-default"
 					>
 						<span className="flex-shrink-0 text-green-500">{type}</span>
 						<span className="text-clip text-blue-200">{value}</span>

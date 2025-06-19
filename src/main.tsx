@@ -7,6 +7,6 @@ const root = document.getElementById("root");
 root &&
 	createRoot(root).render(
 		<StrictMode>
-			<App />
+			<App />,
 		</StrictMode>,
 	);

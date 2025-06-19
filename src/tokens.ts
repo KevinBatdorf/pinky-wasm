@@ -22,6 +22,7 @@ export type TokenType =
 	| "STRING"
 	| "NUMBER"
 	| "IF"
+	| "ELIF"
 	| "THEN"
 	| "ELSE"
 	| "TRUE"
@@ -50,8 +51,9 @@ export interface Token {
 
 export const keywords: { [key: string]: TokenType } = {
 	if: "IF",
-	// biome-ignore lint:
+	// biome-ignore lint: allow using then
 	then: "THEN",
+	elif: "ELIF",
 	else: "ELSE",
 	true: "TRUE",
 	false: "FALSE",
@@ -79,12 +81,17 @@ export const tokenTypes: { [key: string]: TokenType } = {
 	"/": "SLASH",
 	"^": "CARET",
 	"%": "MOD",
-	"!": "NOT",
+	"~": "NOT",
 	">": "GT",
 	"<": "LT",
 	">=": "GE",
 	"<=": "LE",
-	"!=": "NE",
+	"~=": "NE",
 	"==": "EQEQ",
 	":=": "ASSIGN",
-};
+} as const;
+
+export const symbolForTokenType: { [K in TokenType]?: string } =
+	Object.fromEntries(
+		Object.entries(tokenTypes).map(([symbol, type]) => [type, symbol]),
+	);

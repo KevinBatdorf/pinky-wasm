@@ -6,59 +6,54 @@ import {
 	type DecorationItem,
 	type Highlighter,
 } from "shiki";
-import type { Token } from "../tokens";
+import type { Location } from "../syntax";
 
 type CodeEditorProps = {
 	value: string;
 	onChange: (value: string) => void;
-	hoveredToken: Token | null;
-	tokenError?: { line: number; column: number; message: string } | null;
+	hovered: Location | null;
+	parseError?: { line: number; column: number; message: string } | null;
 };
 
 export const CodeEditor = (props: CodeEditorProps) => {
 	const textAreaRef = useRef<HTMLDivElement>(null);
 	const [highlighter, setHighlighter] = useState<Highlighter | null>(null);
-	const { value, onChange, hoveredToken, tokenError, ...remainingProps } =
-		props;
+	const { value, onChange, hovered, parseError, ...remainingProps } = props;
 
 	useEffect(() => {
 		createHighlighter({
 			langs: [pinkyGrammar],
-			themes: ["material-theme-palenight"],
+			themes: ["catppuccin-macchiato"],
 		}).then(setHighlighter);
 	}, []);
 
 	useEffect(() => {
-		if (!hoveredToken) return;
+		if (!hovered) return;
 		document.querySelector(".hovered-token")?.scrollIntoView({
 			behavior: "smooth",
 			block: "nearest",
 		});
-	}, [hoveredToken]);
+	}, [hovered]);
 
 	const decorations = useMemo<DecorationItem[]>(() => {
 		if (!highlighter || !value) return [];
-		if (!hoveredToken && !tokenError) return [];
+		if (!hovered && !parseError) return [];
 
 		const newDecorations: DecorationItem[] = [];
-		if (hoveredToken) {
-			const line = hoveredToken.line - 1;
-			const character = hoveredToken.column - 1;
+		if (hovered) {
+			const { start, end } = hovered;
 			newDecorations.push({
-				start: { line, character },
+				start: { line: start.line - 1, character: start.column - 1 },
 				end: {
-					line,
-					character:
-						hoveredToken.value.length +
-						hoveredToken.column +
-						(hoveredToken.type === "STRING" ? 1 : -1),
+					line: end.line - 1,
+					character: end.column - 1,
 				},
 				properties: { class: "hovered-token" },
 			});
 		}
-		if (tokenError) {
-			const line = tokenError.line - 1;
-			const character = tokenError.column - 1;
+		if (parseError) {
+			const line = parseError.line - 1;
+			const character = parseError.column - 1;
 			newDecorations.push({
 				start: { line, character },
 				end: { line, character: character + 1 },
@@ -66,7 +61,7 @@ export const CodeEditor = (props: CodeEditorProps) => {
 			});
 		}
 		return newDecorations;
-	}, [hoveredToken, highlighter, tokenError, value]);
+	}, [hovered, highlighter, parseError, value]);
 
 	if (!highlighter) return null;
 
@@ -90,7 +85,7 @@ export const CodeEditor = (props: CodeEditorProps) => {
 					highlighter
 						.codeToHtml(code, {
 							lang: "pinky",
-							theme: "material-theme-palenight",
+							theme: "catppuccin-macchiato",
 							decorations,
 						})
 						?.replace(/<\/?[pre|code][^>]*>/g, "")
