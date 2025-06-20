@@ -17,6 +17,7 @@ export const ASTComponent = ({
 	const errorRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
 		if (!errorRef.current || !error) return;
+		if (window.innerWidth < 768) return;
 		errorRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
 	}, [error]);
 
