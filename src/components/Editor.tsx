@@ -53,13 +53,12 @@ export const CodeEditor = (props: CodeEditorProps) => {
 			});
 		}
 		if (parseError) {
-			const programEnd = parseError.body.loc.end.column - 1; // minus EOF
+			const codeLength = value.length;
 			const line = parseError.line - 1; // zero-based index
 			let character = parseError.column - 1; // zero-based index
-			console.log({ parseError, programEnd, line, character });
 			// If the error is at the end of the line, we need to adjust the character position
-			if (character >= programEnd) {
-				character = programEnd - 1;
+			if (character >= codeLength) {
+				character = codeLength - 1;
 			}
 			newDecorations.push({
 				start: { line, character },
