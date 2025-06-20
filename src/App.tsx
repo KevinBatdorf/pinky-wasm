@@ -215,7 +215,7 @@ function App() {
 					</div>
 				</div>
 			</div>
-			<div className="w-16 bg-gray-800 md:hidden flex-shrink-0" />
+			<div className="w-10 bg-gray-800 md:hidden flex-shrink-0" />
 		</div>
 	);
 }
