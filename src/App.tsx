@@ -46,6 +46,11 @@ function App() {
 	}, [tokens]);
 
 	const handleHover = (loc: Location) => {
+		//ignore < 768px
+		if (window.innerWidth < 768) {
+			setHoveredToken(null);
+			return;
+		}
 		setHoveredToken((prev) => {
 			const { start, end } = loc;
 			if (
@@ -63,81 +68,154 @@ function App() {
 	const handleLeave = () => {
 		setHoveredToken(null);
 	};
-
+	const handleOnChange = (value: string) => {
+		setHoveredToken(null);
+		setCode(value);
+	};
 	return (
-		<div className="flex justify-between h-screen overflow-hidden">
-			<div className="text-sm p-1 max-h-screen w-52 border-r border-gray-800 flex flex-col overflow-hidden h-screen flex-shrink-0">
-				<div className="flex items-center justify-between bg-black">
-					<span className="">Tokens</span>
-					<span className="text-xs text-gray-500">
-						({tokenPerf.toFixed(2)}ms)
-					</span>
-				</div>
-				<pre className="selection:bg-yellow-500 selection:text-black overflow-x-hidden overflow-y-auto flex-grow">
-					<TokensComponent
-						tokens={tokens}
-						error={tokenError}
-						handleHover={handleHover}
-						handleLeave={handleLeave}
+		<div className="flex">
+			<div
+				className="flex-wrap w-full md:h-screen md:overflow-hidden divide-y-16 md:divide-y-0 divide-gray-800
+            grid
+            grid-cols-1
+            sm:grid-cols-2
+            md:grid-cols-[1fr_14rem_14rem]
+            lg:grid-cols-[14rem_1fr_14rem_14rem]
+            xl:grid-cols-[14rem_1fr_14rem_14rem_14rem]
+
+            grid-rows-5
+            sm:grid-rows-3
+            md:grid-rows-2
+            xl:grid-rows-1
+            "
+			>
+				<div
+					className="w-full p-1 overflow-hidden flex flex-col h-screen border-gray-800 md:border-r
+                sm:col-span-2
+                md:col-span-1
+                lg:col-start-2
+
+                row-span-1
+                md:row-span-2
+                lg:row-start-1
+                "
+				>
+					<div className="flex items-center justify-between text-sm bg-black">
+						<a
+							href="https://pinky-lang.org/"
+							target="_blank"
+							rel="noopener noreferrer"
+							className="pl-4 text-[#FF66C4]"
+						>
+							Pinky Scripting Language
+						</a>
+						<a
+							target="_blank"
+							rel="noopener noreferrer"
+							href="https://github.com/KevinBatdorf/pinky-wasm"
+							className="text-xs text-gray-500"
+						>
+							(GitHub)
+						</a>
+					</div>
+					<CodeEditor
+						parseError={astError}
+						hovered={hovered}
+						value={code}
+						onChange={handleOnChange}
 					/>
-				</pre>
-			</div>
-			<div className="flex-grow border-r border-gray-800 p-1 overflow-hidden h-screen flex flex-col min-w-96">
-				<div className="flex items-center justify-between text-sm bg-black">
-					<a
-						href="https://pinky-lang.org/"
-						target="_blank"
-						rel="noopener noreferrer"
-						className="pl-4 text-[#FF66C4]"
-					>
-						Pinky Scripting Language
-					</a>
-					<a
-						target="_blank"
-						rel="noopener noreferrer"
-						href="https://github.com/KevinBatdorf/pinky-wasm"
-						className="text-xs text-gray-500"
-					>
-						(GitHub)
-					</a>
 				</div>
-				<CodeEditor
-					parseError={astError}
-					hovered={hovered}
-					value={code}
-					onChange={setCode}
-				/>
-			</div>
-			<div className="text-sm border-r border-gray-800 p-1 w-56 h-screen overflow-hidden flex flex-col flex-shrink-0">
-				<div className="flex items-center justify-between text-sm bg-black">
-					<span>AST</span>
-					<span className="text-xs text-gray-500">
-						({astPerf.toFixed(2)}ms)
-					</span>
-				</div>
-				<div className="selection:bg-blue-500 selection:text-black overflow-x-auto overflow-y-auto h-screen">
-					{ast && (
-						<ASTComponent
-							ast={ast}
-							error={astError}
+				<div
+					className="text-sm p-1 flex flex-col overflow-hidden h-screen md:h-full border-gray-800 sm:border-r
+                sm:col-start-1
+                md:col-start-2
+                lg:col-start-1
+
+                row-span-1
+                lg:row-span-2
+                xl:row-span-1
+                md:row-start-1
+                "
+				>
+					<div className="flex items-center justify-between bg-black">
+						<span className="">Tokens</span>
+						<span className="text-xs text-gray-500">
+							({tokenPerf.toFixed(2)}ms)
+						</span>
+					</div>
+					<pre className="selection:bg-yellow-500 selection:text-black overflow-x-hidden overflow-y-auto flex-grow">
+						<TokensComponent
+							tokens={tokens}
+							error={tokenError}
 							handleHover={handleHover}
 							handleLeave={handleLeave}
 						/>
-					)}
+					</pre>
+				</div>
+				<div
+					className="text-sm p-1 overflow-hidden flex flex-col h-screen md:h-full border-gray-800 md:border-r md:border-t lg:boder-t-0
+                sm:col-start-2
+                lg:col-start-3
+                lg:col-span-1
+
+                lg:row-span-2
+                xl:row-span-1
+                md:row-start-2
+                lg:row-start-1
+                "
+				>
+					<div className="flex items-center justify-between text-sm bg-black">
+						<span>AST</span>
+						<span className="text-xs text-gray-500">
+							({astPerf.toFixed(2)}ms)
+						</span>
+					</div>
+					<div className="selection:bg-blue-500 selection:text-black overflow-x-auto overflow-y-auto">
+						{ast && (
+							<ASTComponent
+								ast={ast}
+								error={astError}
+								handleHover={handleHover}
+								handleLeave={handleLeave}
+							/>
+						)}
+					</div>
+				</div>
+				<div
+					className="text-sm p-1 h-screen border-gray-800 sm:border-r
+                sm:col-start-1
+                md:col-start-3
+                lg:col-start-4
+
+                sm:row-start-3
+                md:row-start-1
+                lg:row-span-1
+                "
+				>
+					<div className="flex items-center justify-between text-sm bg-black">
+						<span>wasm bytecode</span>
+						<span className="text-xs text-gray-500">(coming soon)</span>
+					</div>
+				</div>
+				<div
+					className="text-sm p-1 h-screen border-gray-800 md:border-t xl:border-t-0
+                sm:col-start-2
+                md:col-start-3
+                lg:col-start-4
+                xl:col-start-5
+
+                sm:row-start-3
+                md:row-start-2
+                lg:row-span-1
+                "
+				>
+					<div className="flex items-center justify-between text-sm bg-black">
+						<span>output</span>
+						<span className="text-xs text-gray-500">(coming soon)</span>
+					</div>
 				</div>
 			</div>
-			<div className="text-sm p-1 w-56 border-r border-gray-800 flex-shrink-0">
-				<div className="flex items-center justify-between text-sm bg-black">
-					<span>wasm bytecode</span>
-					<span className="text-xs text-gray-500">(coming soon)</span>
-				</div>
-			</div>
-			<div className="text-sm p-1 w-56 flex-shrink-0">
-				<div className="flex items-center justify-between text-sm bg-black">
-					<span>output</span>
-					<span className="text-xs text-gray-500">(coming soon)</span>
-				</div>
-			</div>
+			<div className="w-16 bg-gray-800 md:hidden flex-shrink-0" />
 		</div>
 	);
 }

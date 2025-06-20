@@ -8,7 +8,6 @@ If you want to learn more about this stuff, I highly recommend the [Compilers, I
 
 TODO:
 - [ ] Add wasm code generation and render output
-- [ ] Add some basic mobile styles
 - [ ] Add lexer error recovery to continue tokenizing
 - [ ] Add parser error recovery to continue parsing
 - [ ] Show more detailed error messages and editor highlights
