@@ -66,13 +66,13 @@ export const isNextToken = (state: ParserState, type: TokenType): boolean => {
 /** Check if the next token is of a specific type and advance the cursor */
 export const expectNext = (state: ParserState, type: TokenType): Token => {
 	if (isNextToken(state, type)) return advance(state);
-	const { tokens, current } = state;
+	const token = peek(state);
 	throw new ParseError(
-		`Expected token type ${type} but found ${tokens[current]?.type}`,
-		makeProgram([], tokens),
-		tokens[current]?.line,
-		tokens[current]?.column,
-		tokens[current]?.value.length || 0,
+		`Expected token type ${type} but found "${token.value}" (${token.type})`,
+		makeProgram([], state.tokens),
+		previousToken(state).line,
+		previousToken(state).column,
+		previousToken(state).value.length || 0,
 	);
 };
 

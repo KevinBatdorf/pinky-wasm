@@ -1,4 +1,8 @@
-export const example = `println "hello world"
-println "foo"
-println "bar"
--- print "Currently only println is supported for wasm code gen"`;
+export const example = `print "hello "
+println "world"
+println ""
+print "heck yeah!"
+-- right now only print/println are implemented
+-- for the wasm compiler
+-- but the lexer and parser are fully functional
+`;

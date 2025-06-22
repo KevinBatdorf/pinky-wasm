@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Token } from "./tokens";
 import { CodeEditor } from "./components/Editor";
 import { example } from "./assets/example";
@@ -16,8 +16,25 @@ console.log("Hey there! 👋 Welcome to the Pinky WASM demo app!");
 
 function App() {
 	const [code, setCode] = useState<string>(example);
-	const [run, setRun] = useState<RunFunction>(() => () => []);
+	const [run, setRun] = useState<RunFunction | null>(null);
 	const [hovered, setHoveredToken] = useState<Location | null>(null);
+	const isMouseDown = useRef(false);
+
+	useEffect(() => {
+		const handleDown = () => {
+			isMouseDown.current = true;
+			setHoveredToken(null);
+		};
+		const handleUp = () => {
+			isMouseDown.current = false;
+		};
+		window.addEventListener("mousedown", handleDown);
+		window.addEventListener("mouseup", handleUp);
+		return () => {
+			window.removeEventListener("mousedown", handleDown);
+			window.removeEventListener("mouseup", handleUp);
+		};
+	}, []);
 
 	useEffect(() => {
 		loadWasm().then(({ run }) => setRun(() => run));
@@ -34,7 +51,7 @@ function App() {
 	}>(() => {
 		const now = performance.now();
 		const { tokens, error } = tokenize(code);
-		console.log({ tokens, error });
+		// console.log({ tokens, error });
 		return { tokens, perf: performance.now() - now, error };
 	}, [code]);
 
@@ -49,7 +66,7 @@ function App() {
 	}>(() => {
 		const now = performance.now();
 		const { ast, error } = parse(tokens);
-		console.log({ ast, error });
+		// console.log({ ast, error });
 		return { ast, perf: performance.now() - now, error };
 	}, [tokens]);
 
@@ -69,7 +86,7 @@ function App() {
 		}
 		const now = performance.now();
 		const { bytes, meta, error } = compile(ast);
-		console.log({ bytes, meta, error });
+		// console.log({ bytes, meta, error });
 		return {
 			bytes,
 			strings: meta.strings,
@@ -87,7 +104,11 @@ function App() {
 		perf: number;
 		error: string | null;
 	}>(() => {
-		if (!bytes || !Array.from(bytes).length) {
+		if (
+			!run ||
+			typeof bytes?.[Symbol.iterator] !== "function" ||
+			!bytes.length
+		) {
 			return { output: null, perf: 0, error: null };
 		}
 		const now = performance.now();
@@ -104,9 +125,14 @@ function App() {
 	}, [bytes, run]);
 
 	const handleHover = (loc: Location) => {
+		// If text is selected or they are selecting, don't bother
+		if (isMouseDown.current) return;
+		const selection = window.getSelection();
+		if (selection?.toString()?.length) return;
+
 		//ignore < 768px
 		if (window.innerWidth < 768) {
-			setHoveredToken(null);
+			// setHoveredToken(null);
 			return;
 		}
 		setHoveredToken((prev) => {
@@ -288,7 +314,17 @@ function App() {
 								<div className="text-wrap text-red-500">{outputError}</div>
 							) : (
 								<div className="pb-60 whitespace-pre-wrap text-gray-100">
-									{output}
+									{output
+										?.join("")
+										.split("\n")
+										.map((line) => (
+											<div
+												key={line}
+												className="before:content-['~>'] before:mr-1.5 before:text-gray-500"
+											>
+												{line}
+											</div>
+										))}
 								</div>
 							)}
 						</pre>

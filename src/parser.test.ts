@@ -113,10 +113,11 @@ test("expectNext advances if token matches", () => {
 
 test("expectNext throws if token does not match", () => {
 	const tokens: Token[] = [
-		{ type: "IDENTIFIER", value: "foo", line: 1, column: 1, start: 0, end: 3 },
+		{ type: "WHILE", value: "while", line: 1, column: 1, start: 0, end: 5 },
+		{ type: "IDENTIFIER", value: "foo", line: 1, column: 7, start: 6, end: 9 },
 		{ type: "EOF", value: "", line: 1, column: 4, start: 3, end: 3 },
 	];
-	const state = { tokens, current: 0 };
+	const state = { tokens, current: 1 };
 	expect(() => expectNext(state, "EQEQ")).toThrow(/Expected token type EQEQ/);
 });
 

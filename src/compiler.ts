@@ -1,6 +1,6 @@
 import type { AST } from "./parser";
 import type { Expression } from "./syntax";
-import { emitSection, encodeLEB, encodeString } from "./wasm";
+import { emitSection, unsignedLEB, signedLEB, encodeString } from "./wasm";
 
 export type CompilerErrorType = Error | null;
 
@@ -90,7 +90,7 @@ const _compile = (
 	const importSection = emitSection(
 		2,
 		new Uint8Array([
-			...encodeLEB(imports.length),
+			...unsignedLEB(imports.length),
 			...imports.flatMap((name) => [
 				...encodeString("env"),
 				...encodeString(name),
@@ -131,7 +131,7 @@ const _compile = (
 			...encodeString("main"),
 			0x00, // export kind: func
             // main is exported after imports (print/println)
-			...encodeLEB(imports.length),
+			...unsignedLEB(imports.length),
 
 			// export "memory" = memory 0
 			...encodeString("memory"),
@@ -147,22 +147,23 @@ const _compile = (
 		// biome-ignore format:
 		new Uint8Array([
             0x01, // 1 function main()
-            ...encodeLEB(funcBody.length),
+            ...unsignedLEB(funcBody.length),
             ...funcBody
         ]),
 	);
 
 	// === Data section ===
+	const stringBytes = strings.getBytes();
 	const dataSection = emitSection(
 		11,
 		// biome-ignore format:
 		new Uint8Array([
 			0x01, // 1 data segment
 			0x00, // memory index 0
-			0x41, ...encodeLEB(0), // i32.const 0 (start offset)
+			0x41, ...unsignedLEB(0), // i32.const 0 (start offset)
 			0x0b, // end
-			...encodeLEB(strings.getBytes().length),
-			...strings.getBytes(),
+			...unsignedLEB(stringBytes.length),
+			...stringBytes,
 		]),
 	);
 
@@ -191,6 +192,11 @@ export const generateBody = (
 				body.push(0x10, functionIndices.println);
 				break;
 			}
+			case "PrintStatement": {
+				body.push(...compileExpression(stmt.expression, strings));
+				body.push(0x10, functionIndices.print);
+				break;
+			}
 			default:
 				throw new Error(`Unsupported statement type: ${stmt.type}`);
 		}
@@ -204,15 +210,17 @@ const compileExpression = (
 	expr: Expression,
 	strings: ReturnType<typeof createStringTable>,
 ): number[] => {
+	const textEncoder = new TextEncoder();
 	switch (expr.type) {
 		case "StringLiteral": {
 			const offset = strings.getOffset(expr.value);
-			const length = expr.value.length;
+			const length = textEncoder.encode(expr.value).length;
+
 			return [
 				0x41,
-				...encodeLEB(offset), // i32.const offset
+				...signedLEB(offset), // i32.const offset
 				0x41,
-				...encodeLEB(length), // i32.const length
+				...signedLEB(length), // i32.const length
 			];
 		}
 		default:
