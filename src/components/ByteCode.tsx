@@ -13,7 +13,6 @@ export const ByteCode = ({
 	return (
 		<div className="flex-grow pb-60">
 			<div className="bg-gray-900 p-1 text-xs rounded mb-1 text-gray-400 whitespace-normal">
-				<div className="text-gray-300">data segment:</div>
 				{strings ? new TextDecoder().decode(strings) : "No strings available"}
 			</div>
 			<div className="flex flex-wrap gap-1 text-xs">
