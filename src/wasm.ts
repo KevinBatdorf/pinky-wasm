@@ -89,6 +89,30 @@ export const typeCode = (t: "i32" | "i64" | "f32" | "f64"): number => {
 			throw new Error(`Unknown type: ${t}`);
 	}
 };
+export const nativeBinOps = {
+	"+": 0xa0, // f64.add
+	"-": 0xa1, // f64.sub
+	"*": 0xa2, // f64.mul
+	"/": 0xa3, // f64.div
+	"==": 0x61, // f64.eq
+	"~=": 0x62, // f64.ne
+	"<": 0x63, // f64.lt
+	">": 0x64, // f64.gt
+	"<=": 0x65, // f64.le
+	">=": 0x66, // f64.ge
+	// unsupported native operators
+	"%": null,
+	"^": null,
+	and: null,
+	or: null,
+} as const;
+
+// export const virtualBinOps = {
+// 	and: true,
+// 	or: true,
+// 	"%": true,
+// 	"^": true,
+// } as const;
 
 export type RunFunction = (bytes: Uint8Array) => string[];
 export const loadWasm = async (): Promise<{ run: RunFunction }> => {

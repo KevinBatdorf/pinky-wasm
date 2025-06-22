@@ -63,11 +63,41 @@ test("strings are empty when no strings used", async () => {
 
 test("print and println with numbers", async () => {
 	const input = `print 5
-println 10`;
+                   println 10`;
 	const { tokens } = tokenize(input);
 	const { ast } = parse(tokens);
 	const { bytes, error } = compile(ast);
 	const output = run(bytes);
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("510\n");
+});
+
+test("prints boolean values", async () => {
+	const input = `print true
+                   println false`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("truefalse\n");
+});
+
+test("prints binary operators", async () => {
+	const input = `print 5 + 3
+                   println 10 - 2
+                   print 4 * 2
+                   println 8 / 2
+                   print 2 == 2
+                   println 2 ~= 3
+                   print 3 < 5
+                   println 5 > 3
+                   print 3 <= 3
+                   println 1 >= 4`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("88\n84\n11\n11\n10\n");
 });

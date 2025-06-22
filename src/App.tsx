@@ -317,9 +317,9 @@ function App() {
 									{output
 										?.join("")
 										.split("\n")
-										.map((line) => (
+										.map((line, i) => (
 											<div
-												key={line}
+												key={`${i}-${line}`}
 												className="before:content-['~>'] before:mr-1.5 before:text-gray-500"
 											>
 												{line}

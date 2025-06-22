@@ -7,9 +7,15 @@ import {
 	encodeString,
 	encodeF64,
 	typeCode,
+	nativeBinOps,
 } from "./wasm";
 
 export type CompilerErrorType = Error | null;
+// Used for passing around types and not worrying about location info
+const dummyLoc = {
+	start: { line: 0, column: 0 },
+	end: { line: 0, column: 0 },
+};
 
 // Set up function signatures
 const importFunctions = [
@@ -228,34 +234,30 @@ export const generateBody = (
 	for (const stmt of ast.body) {
 		switch (stmt.type) {
 			case "PrintlnStatement":
-				instructions.push(...compileExpression(stmt.expression, strings));
-				if (stmt.expression.type === "NumberLiteral") {
-					console.log("Compiling println_64");
+				instructions.push(...compileForPrint(stmt.expression, strings));
+				if (isF64Expression(stmt.expression)) {
 					instructions.push(0x10, functionIndices.println_64);
 					break;
 				}
-				console.log("Compiling println");
 				instructions.push(0x10, functionIndices.println);
 				break;
 
 			case "PrintStatement":
-				instructions.push(...compileExpression(stmt.expression, strings));
-				if (stmt.expression.type === "NumberLiteral") {
+				instructions.push(...compileForPrint(stmt.expression, strings));
+				if (isF64Expression(stmt.expression)) {
 					instructions.push(0x10, functionIndices.print_64);
 					break;
 				}
 				instructions.push(0x10, functionIndices.print);
 				break;
 
+			case "ExpressionStatement":
+				console.log({ stmt });
+				break;
 			default:
 				throw new Error(`Unsupported statement type: ${stmt.type}`);
 		}
 	}
-	console.log(
-		"Emitted instructions",
-		instructions.map((b) => b?.toString(16)),
-	);
-	console.log(functionIndices);
 
 	return [
 		...unsignedLEB(0), // no local variables
@@ -264,6 +266,8 @@ export const generateBody = (
 	];
 };
 
+export const isF64Expression = (expr: Expression): boolean =>
+	["NumberLiteral", "BinaryExpression"].includes(expr.type);
 const compileExpression = (
 	expr: Expression,
 	strings: ReturnType<typeof createStringTable>,
@@ -271,8 +275,8 @@ const compileExpression = (
 	const textEncoder = new TextEncoder();
 	switch (expr.type) {
 		case "StringLiteral": {
-			const offset = strings.getOffset(expr.value);
-			const length = textEncoder.encode(expr.value).length;
+			const offset = strings.getOffset(String(expr.value));
+			const length = textEncoder.encode(String(expr.value)).length;
 			return [
 				0x41,
 				...signedLEB(offset), // i32.const offset
@@ -283,10 +287,54 @@ const compileExpression = (
 		case "NumberLiteral": {
 			return [
 				0x44,
-				...encodeF64(Number.parseFloat(String(expr.value))), // f64.const value
+				...encodeF64(expr.value), // f64.const value
 			];
+		}
+		case "BooleanLiteral":
+			return [
+				0x41,
+				...signedLEB(expr.value ? 1 : 0), // treat as i32 for now
+			];
+		case "BinaryExpression": {
+			const left = compileExpression(expr.left, strings);
+			const right = compileExpression(expr.right, strings);
+			const opcode = nativeBinOps[expr.operator];
+			// Native operators supported for f64
+			if (opcode !== null) {
+				const isComparison = ["==", "~=", ">", ">=", "<", "<="].includes(
+					expr.operator,
+				);
+
+				// TODO: this converts to i32 for print support, which outputs 1/0
+				return isComparison
+					? [...left, ...right, opcode, 0xb7] // f64.convert_i32_u
+					: [...left, ...right, opcode];
+			}
+			switch (expr.operator) {
+				case "%":
+				case "^":
+				case "and":
+				case "or":
+					throw new Error("TODO");
+				default:
+					throw new Error(`Unsupported binary operator: ${expr.operator}`);
+			}
 		}
 		default:
 			throw new Error(`Unsupported expression type: ${expr.type}`);
 	}
+};
+
+const compileForPrint = (
+	expr: Expression,
+	strings: ReturnType<typeof createStringTable>,
+): number[] => {
+	if (expr.type === "BooleanLiteral") {
+		const str = expr.value ? "true" : "false";
+		return compileExpression(
+			{ type: "StringLiteral", value: str, loc: dummyLoc },
+			strings,
+		);
+	}
+	return compileExpression(expr, strings);
 };
