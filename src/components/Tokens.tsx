@@ -26,7 +26,7 @@ export const TokensComponent = ({
 	if (!tokens.length) return null;
 
 	return (
-		<div className="flex-grow pb-60 ">
+		<div className="flex-grow pb-60">
 			{tokens.map((token) => {
 				const { line, column, start, type, value } = token;
 				return (

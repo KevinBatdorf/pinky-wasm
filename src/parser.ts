@@ -16,12 +16,20 @@ class ParseError extends Error {
 	body: Program;
 	line: number;
 	column: number;
-	constructor(message: string, body: Program, line: number, column: number) {
+	tokenLength: number;
+	constructor(
+		message: string,
+		body: Program,
+		line: number,
+		column: number,
+		tokenLength: number,
+	) {
 		super(message);
 		this.name = "ParseError";
 		this.body = body;
 		this.line = line;
 		this.column = column;
+		this.tokenLength = tokenLength;
 	}
 }
 export type ParseErrorType = null | ParseError;
@@ -64,6 +72,7 @@ export const expectNext = (state: ParserState, type: TokenType): Token => {
 		makeProgram([], tokens),
 		tokens[current]?.line,
 		tokens[current]?.column,
+		tokens[current]?.value.length || 0,
 	);
 };
 
@@ -143,8 +152,9 @@ const parseStatements = (state: ParserState): Statement[] => {
 			throw new ParseError(
 				err.message,
 				makeProgram(body, state.tokens),
-				err.line ?? peek(state).line,
-				err.column ?? peek(state).column,
+				err.line ?? previousToken(state).line,
+				err.column ?? previousToken(state).column,
+				err.tokenLength ?? previousToken(state).value.length,
 			);
 		}
 	}
@@ -239,8 +249,9 @@ const parseStatement = (state: ParserState): Statement => {
 				throw new ParseError(
 					"Expected identifier after 'for'",
 					makeProgram([], state.tokens),
-					token.line,
-					token.column,
+					previousToken(state).line,
+					previousToken(state).column,
+					previousToken(state).value.length,
 				);
 			}
 			const identifier = parsePrimary(state) as Identifier;
@@ -290,8 +301,9 @@ const parseStatement = (state: ParserState): Statement => {
 						throw new ParseError(
 							"Expected identifier in function parameters",
 							makeProgram([], state.tokens),
-							token.line,
-							token.column,
+							previousToken(state).line,
+							previousToken(state).column,
+							previousToken(state).value.length,
 						);
 					}
 					params.push(parsePrimary(state) as Identifier);
@@ -339,8 +351,9 @@ const parseStatement = (state: ParserState): Statement => {
 				throw new ParseError(
 					"Expected identifier after 'local'",
 					makeProgram([], state.tokens),
-					token.line,
-					token.column,
+					previousToken(state).line,
+					previousToken(state).column,
+					previousToken(state).value.length,
 				);
 			}
 			const identifier = parsePrimary(state) as Identifier;
@@ -360,8 +373,9 @@ const parseStatement = (state: ParserState): Statement => {
 			throw new ParseError(
 				"Unexpected end of input: expected statement",
 				makeProgram([], state.tokens),
-				token.line,
-				token.column,
+				previousToken(state).line,
+				previousToken(state).column,
+				previousToken(state).value.length,
 			);
 		default: {
 			const left = parseExpression(state);
@@ -377,10 +391,7 @@ const parseStatement = (state: ParserState): Statement => {
 			return {
 				type: "ExpressionStatement",
 				expression: left,
-				loc: {
-					start: left.loc.start,
-					end: left.loc.end,
-				},
+				loc: { start: left.loc.start, end: left.loc.end },
 			};
 		}
 	}
@@ -625,15 +636,17 @@ const parsePrimary = (state: ParserState): Expression => {
 			throw new ParseError(
 				"Unexpected end of input: expected expression",
 				makeProgram([], state.tokens),
-				token.line,
-				token.column,
+				previousToken(state).line,
+				previousToken(state).column,
+				previousToken(state).value.length,
 			);
 		default: {
 			throw new ParseError(
 				`Unexpected token type ${token?.type} in expression`,
 				makeProgram([], state.tokens),
-				token?.line,
-				token?.column,
+				previousToken(state).line,
+				previousToken(state).column,
+				previousToken(state).value.length,
 			);
 		}
 	}

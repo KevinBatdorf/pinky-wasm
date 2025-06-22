@@ -1122,7 +1122,8 @@ test("handles parsing errors gracefully", () => {
 	expect(error?.message).toBe("Unexpected end of input: expected expression");
 	expect(error?.body).toEqual(expectedAst);
 	expect(error?.line).toBe(2);
-	expect(error?.column).toBe(4);
+	expect(error?.column).toBe(3);
+	expect(error?.tokenLength).toBe(1);
 	expect(error?.name).toBe("ParseError");
 });
 

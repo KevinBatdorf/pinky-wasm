@@ -8,18 +8,27 @@ import {
 } from "shiki";
 import type { Location } from "../syntax";
 import type { ParseErrorType } from "../parser";
+import type { TokenErrorType } from "../lexer";
 
 type CodeEditorProps = {
 	value: string;
 	onChange: (value: string) => void;
 	hovered: Location | null;
-	parseError?: ParseErrorType | null;
+	parseError?: ParseErrorType;
+	tokenError?: TokenErrorType;
 };
 
 export const CodeEditor = (props: CodeEditorProps) => {
 	const textAreaRef = useRef<HTMLDivElement>(null);
 	const [highlighter, setHighlighter] = useState<Highlighter | null>(null);
-	const { value, onChange, hovered, parseError, ...remainingProps } = props;
+	const {
+		value,
+		onChange,
+		hovered,
+		parseError,
+		tokenError,
+		...remainingProps
+	} = props;
 
 	useEffect(() => {
 		createHighlighter({
@@ -38,7 +47,7 @@ export const CodeEditor = (props: CodeEditorProps) => {
 
 	const decorations = useMemo<DecorationItem[]>(() => {
 		if (!highlighter || !value) return [];
-		if (!hovered && !parseError) return [];
+		if (!hovered && !parseError && !tokenError) return [];
 
 		const newDecorations: DecorationItem[] = [];
 		if (hovered) {
@@ -52,22 +61,29 @@ export const CodeEditor = (props: CodeEditorProps) => {
 				properties: { class: "hovered-token" },
 			});
 		}
-		if (parseError) {
-			const codeLength = value.length;
-			const line = parseError.line - 1; // zero-based index
-			let character = parseError.column - 1; // zero-based index
-			// If the error is at the end of the line, we need to adjust the character position
-			if (character >= codeLength) {
-				character = codeLength - 1;
-			}
+		if (tokenError) {
+			const { line, column } = tokenError;
 			newDecorations.push({
+				// zero-based index
+				start: { line: line - 1, character: column - 1 },
+				end: { line: line - 1, character: column },
+				properties: { class: "error-token" },
+			});
+			return newDecorations;
+		}
+		if (parseError) {
+			const line = parseError.line - 1;
+			const character = parseError.column - 1;
+			const length = parseError.tokenLength || 1;
+			newDecorations.push({
+				// zero-based index
 				start: { line, character },
-				end: { line, character: character + 1 },
+				end: { line, character: character + length },
 				properties: { class: "error-token" },
 			});
 		}
 		return newDecorations;
-	}, [hovered, highlighter, parseError, value]);
+	}, [hovered, highlighter, parseError, value, tokenError]);
 
 	if (!highlighter) return null;
 
@@ -76,8 +92,9 @@ export const CodeEditor = (props: CodeEditorProps) => {
 			<Editor
 				autoFocus
 				value={value}
-				className="font-jetbrains-mono"
+				className="font-mono"
 				onValueChange={onChange}
+				onClick={() => onChange(value)}
 				{...remainingProps}
 				padding={16}
 				style={{
@@ -86,6 +103,7 @@ export const CodeEditor = (props: CodeEditorProps) => {
 					overflowY: "auto",
 					paddingBottom: "10rem",
 					width: "100%",
+					height: "100%",
 				}}
 				highlight={(code: string) =>
 					highlighter

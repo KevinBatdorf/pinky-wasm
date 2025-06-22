@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Token } from "./tokens";
 import { CodeEditor } from "./components/Editor";
 import { example } from "./assets/example";
@@ -8,12 +8,20 @@ import { parse } from "./parser";
 import { ASTComponent } from "./components/AST";
 import type { ParseErrorType } from "./parser";
 import type { Program, Location } from "./syntax";
+import { compile, type CompilerErrorType } from "./compiler";
+import { ByteCode } from "./components/ByteCode";
+import { loadWasm, type RunFunction } from "./wasm";
 
 console.log("Hey there! 👋 Welcome to the Pinky WASM demo app!");
 
 function App() {
 	const [code, setCode] = useState<string>(example);
+	const [run, setRun] = useState<RunFunction>(() => () => []);
 	const [hovered, setHoveredToken] = useState<Location | null>(null);
+
+	useEffect(() => {
+		loadWasm().then(({ run }) => setRun(() => run));
+	}, []);
 
 	const {
 		tokens,
@@ -44,6 +52,56 @@ function App() {
 		console.log({ ast, error });
 		return { ast, perf: performance.now() - now, error };
 	}, [tokens]);
+
+	const {
+		bytes,
+		strings,
+		perf: compilerPerf,
+		error: compilerError,
+	} = useMemo<{
+		bytes: Uint8Array<ArrayBufferLike> | null;
+		strings: Uint8Array | null;
+		perf: number;
+		error: CompilerErrorType;
+	}>(() => {
+		if (!ast) {
+			return { bytes: null, strings: null, perf: 0, error: null };
+		}
+		const now = performance.now();
+		const { bytes, meta, error } = compile(ast);
+		console.log({ bytes, meta, error });
+		return {
+			bytes,
+			strings: meta.strings,
+			perf: performance.now() - now,
+			error,
+		};
+	}, [ast]);
+
+	const {
+		output,
+		perf: outputPerf,
+		error: outputError,
+	} = useMemo<{
+		output: string[] | null;
+		perf: number;
+		error: string | null;
+	}>(() => {
+		if (!bytes || !Array.from(bytes).length) {
+			return { output: null, perf: 0, error: null };
+		}
+		const now = performance.now();
+		try {
+			const output = run(bytes);
+			return { output, perf: performance.now() - now, error: null };
+		} catch (err) {
+			return {
+				output: null,
+				perf: performance.now() - now,
+				error: String(err),
+			};
+		}
+	}, [bytes, run]);
 
 	const handleHover = (loc: Location) => {
 		//ignore < 768px
@@ -83,9 +141,9 @@ function App() {
             grid
             grid-cols-1
             sm:grid-cols-2
-            md:grid-cols-[1fr_14rem_14rem]
-            lg:grid-cols-[14rem_1fr_14rem_14rem]
-            xl:grid-cols-[14rem_1fr_14rem_14rem_14rem]
+            md:grid-cols-[1fr_13.55rem_13.55rem]
+            lg:grid-cols-[13.55rem_1fr_13.55rem_13.55rem]
+            xl:grid-cols-[13.55rem_1fr_13.55rem_13.55rem_13.55rem]
 
             grid-rows-5
             sm:grid-rows-3
@@ -124,6 +182,7 @@ function App() {
 						</div>
 						<CodeEditor
 							parseError={astError}
+							tokenError={tokenError}
 							hovered={hovered}
 							value={code}
 							onChange={handleOnChange}
@@ -186,7 +245,7 @@ function App() {
 						</div>
 					</div>
 					<div
-						className="text-sm p-1 h-screen border-gray-800 sm:border-r
+						className="text-sm p-1 h-screen md:h-full border-gray-800 sm:border-r overflow-hidden flex flex-col
                 sm:col-start-1
                 md:col-start-3
                 lg:col-start-4
@@ -197,12 +256,17 @@ function App() {
                 "
 					>
 						<div className="flex items-center justify-between text-sm bg-black">
-							<span>wasm bytecode</span>
-							<span className="text-xs text-gray-500">(coming soon)</span>
+							<span>wasm</span>
+							<span className="text-xs text-gray-500">
+								(wip {compilerPerf.toFixed(2)}ms)
+							</span>
 						</div>
+						<pre className="selection:bg-blue-700 selection:text-white overflow-x-hidden overflow-y-auto flex-grow whitespace-pre-wrap">
+							<ByteCode bytes={bytes} strings={strings} error={compilerError} />
+						</pre>
 					</div>
 					<div
-						className="text-sm p-1 h-screen border-gray-800 md:border-t xl:border-t-0
+						className="flex flex-col text-sm p-1 h-screen md:h-full border-gray-800 md:border-t xl:border-t-0 overflow-hidden
                 sm:col-start-2
                 md:col-start-3
                 lg:col-start-4
@@ -215,8 +279,19 @@ function App() {
 					>
 						<div className="flex items-center justify-between text-sm bg-black">
 							<span>output</span>
-							<span className="text-xs text-gray-500">(coming soon)</span>
+							<span className="text-xs text-gray-500">
+								(wip {outputPerf.toFixed(2)}ms)
+							</span>
 						</div>
+						<pre className="overflow-x-hidden overflow-y-auto">
+							{outputError ? (
+								<div className="text-wrap text-red-500">{outputError}</div>
+							) : (
+								<div className="pb-60 whitespace-pre-wrap text-gray-100">
+									{output}
+								</div>
+							)}
+						</pre>
 					</div>
 				</div>
 				<div className="w-10 bg-gray-800 md:hidden flex-shrink-0" />
