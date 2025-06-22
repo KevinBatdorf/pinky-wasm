@@ -152,7 +152,7 @@ function App() {
             "
 				>
 					<div
-						className="w-full p-1 overflow-hidden flex flex-col h-screen border-gray-800 md:border-r pt-6 md:pt-0
+						className="w-full p-1 overflow-hidden flex flex-col h-screen border-gray-800 md:border-r pt-6 md:pt-1
                 sm:col-span-2
                 md:col-span-1
                 lg:col-start-2
@@ -201,7 +201,7 @@ function App() {
                 "
 					>
 						<div className="flex items-center justify-between bg-black">
-							<span className="">Tokens</span>
+							<span className="">tokens</span>
 							<span className="text-xs text-gray-500">
 								({tokenPerf.toFixed(2)}ms)
 							</span>
@@ -216,7 +216,7 @@ function App() {
 						</pre>
 					</div>
 					<div
-						className="text-sm p-1 overflow-hidden flex flex-col h-screen md:h-full border-gray-800 md:border-r md:border-t lg:boder-t-0
+						className="text-sm p-1 overflow-hidden flex flex-col h-screen md:h-full border-gray-800 md:border-r md:border-t lg:border-t-0
                 sm:col-start-2
                 lg:col-start-3
                 lg:col-span-1
@@ -228,7 +228,7 @@ function App() {
                 "
 					>
 						<div className="flex items-center justify-between text-sm bg-black">
-							<span>AST</span>
+							<span>ast</span>
 							<span className="text-xs text-gray-500">
 								({astPerf.toFixed(2)}ms)
 							</span>

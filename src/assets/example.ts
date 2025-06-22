@@ -1,4 +1,4 @@
 export const example = `println "hello world"
 println "foo"
 println "bar"
--- print "Currently only println is supported"`;
+-- print "Currently only println is supported for wasm code gen"`;
