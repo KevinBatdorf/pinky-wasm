@@ -1,11 +1,52 @@
 import type { AST } from "./parser";
 import type { Expression } from "./syntax";
-import { emitSection, unsignedLEB, signedLEB, encodeString } from "./wasm";
+import {
+	emitSection,
+	unsignedLEB,
+	signedLEB,
+	encodeString,
+	encodeF64,
+	typeCode,
+} from "./wasm";
 
 export type CompilerErrorType = Error | null;
 
-const imports = ["print", "println"];
-const functionIndices = Object.fromEntries(imports.map((name, i) => [name, i]));
+// Set up function signatures
+const importFunctions = [
+	{ name: "print", type: { params: ["i32", "i32"], results: [] } },
+	{ name: "println", type: { params: ["i32", "i32"], results: [] } },
+	{ name: "print_64", type: { params: ["f64"], results: [] } },
+	{ name: "println_64", type: { params: ["f64"], results: [] } },
+] as const;
+const definedFunctions = [{ name: "main", type: { params: [], results: [] } }];
+const allFunctions = [...definedFunctions, ...importFunctions];
+// We can only add a type once, so we use a map to track them
+const typeMap = new Map<string, number>();
+const typeEntries: number[][] = [];
+const functionIndices: Record<string, number> = {};
+const getTypeKey = (type: {
+	params: readonly string[];
+	results: readonly string[];
+}) => `(${type.params.join(",")})=>(${type.results.join(",")})`;
+
+for (const imp of allFunctions) {
+	const key = getTypeKey(imp.type);
+	if (typeMap.has(key)) continue;
+	typeMap.set(key, typeMap.size); // increment as we add
+	typeEntries.push([
+		0x60, // function type
+		...unsignedLEB(imp.type.params.length), // number of params
+		...imp.type.params.map((p) => typeCode(p)), // params
+		...unsignedLEB(imp.type.results.length), // number of results
+		...imp.type.results.map((r) => typeCode(r)), // results
+	]);
+}
+importFunctions.forEach((imp, i) => {
+	functionIndices[imp.name] = i;
+});
+definedFunctions.forEach((def, i) => {
+	functionIndices[def.name] = importFunctions.length + i;
+});
 
 // Create a string table to manage string offsets in the WASM binary
 const createStringTable = () => {
@@ -71,16 +112,8 @@ const _compile = (
 		1,
 		// biome-ignore format:
 		new Uint8Array([
-			0x02, // 2 types defined here
-            // 0: main()
-            0x60, // indicates this is a function type
-            0x00, // no params
-            0x00, // no return
-            // 1: print/println(pointer: i32, stringOffset: i32)
-			0x60,
-			0x02, // 2 parameters
-			0x7f, 0x7f, // i32, i32
-			0x00, // no return
+			...unsignedLEB(typeEntries.length), // number of types
+            ...typeEntries.flat(), // all type entries defined at the top
 		]),
 	);
 
@@ -90,13 +123,20 @@ const _compile = (
 	const importSection = emitSection(
 		2,
 		new Uint8Array([
-			...unsignedLEB(imports.length),
-			...imports.flatMap((name) => [
-				...encodeString("env"),
-				...encodeString(name),
-				0x00, // kind 0x00 (function import)
-				0x01, // type index 1 (i32, i32) -> void
-			]),
+			...unsignedLEB(importFunctions.length),
+			...importFunctions.flatMap((imp) => {
+				const key = getTypeKey(imp.type);
+				const typeIndex = typeMap.get(key);
+				if (typeIndex === undefined) {
+					throw new Error(`Type not found for import "${imp.name}"`);
+				}
+				return [
+					...encodeString("env"),
+					...encodeString(imp.name),
+					0x00, // kind 0x00 (function import)
+					...unsignedLEB(typeIndex), // type index
+				];
+			}),
 		]),
 	);
 
@@ -131,7 +171,7 @@ const _compile = (
 			...encodeString("main"),
 			0x00, // export kind: func
             // main is exported after imports (print/println)
-			...unsignedLEB(imports.length),
+			...unsignedLEB(functionIndices.main),
 
 			// export "memory" = memory 0
 			...encodeString("memory"),
@@ -183,27 +223,45 @@ export const generateBody = (
 	ast: AST,
 	strings: ReturnType<typeof createStringTable>,
 ): number[] => {
-	const body: number[] = [0x00]; // locals count (currently 0)
+	const instructions: number[] = [];
 
 	for (const stmt of ast.body) {
 		switch (stmt.type) {
-			case "PrintlnStatement": {
-				body.push(...compileExpression(stmt.expression, strings));
-				body.push(0x10, functionIndices.println);
+			case "PrintlnStatement":
+				instructions.push(...compileExpression(stmt.expression, strings));
+				if (stmt.expression.type === "NumberLiteral") {
+					console.log("Compiling println_64");
+					instructions.push(0x10, functionIndices.println_64);
+					break;
+				}
+				console.log("Compiling println");
+				instructions.push(0x10, functionIndices.println);
 				break;
-			}
-			case "PrintStatement": {
-				body.push(...compileExpression(stmt.expression, strings));
-				body.push(0x10, functionIndices.print);
+
+			case "PrintStatement":
+				instructions.push(...compileExpression(stmt.expression, strings));
+				if (stmt.expression.type === "NumberLiteral") {
+					instructions.push(0x10, functionIndices.print_64);
+					break;
+				}
+				instructions.push(0x10, functionIndices.print);
 				break;
-			}
+
 			default:
 				throw new Error(`Unsupported statement type: ${stmt.type}`);
 		}
 	}
+	console.log(
+		"Emitted instructions",
+		instructions.map((b) => b?.toString(16)),
+	);
+	console.log(functionIndices);
 
-	body.push(0x0b); // end
-	return body;
+	return [
+		...unsignedLEB(0), // no local variables
+		...instructions,
+		0x0b,
+	];
 };
 
 const compileExpression = (
@@ -215,12 +273,17 @@ const compileExpression = (
 		case "StringLiteral": {
 			const offset = strings.getOffset(expr.value);
 			const length = textEncoder.encode(expr.value).length;
-
 			return [
 				0x41,
 				...signedLEB(offset), // i32.const offset
 				0x41,
 				...signedLEB(length), // i32.const length
+			];
+		}
+		case "NumberLiteral": {
+			return [
+				0x44,
+				...encodeF64(Number.parseFloat(String(expr.value))), // f64.const value
 			];
 		}
 		default:

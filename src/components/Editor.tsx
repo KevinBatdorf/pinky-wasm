@@ -49,7 +49,6 @@ export const CodeEditor = (props: CodeEditorProps) => {
 		if (!highlighter || !value) return [];
 		if (!hovered && !parseError && !tokenError) return [];
 
-		console.log({ hovered, parseError, tokenError });
 		const newDecorations: DecorationItem[] = [];
 		if (hovered) {
 			const { start, end } = hovered;

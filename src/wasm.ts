@@ -56,6 +56,12 @@ export const signedLEB = (value: number): number[] => {
 	return bytes;
 };
 
+export const encodeF64 = (value: number): number[] => {
+	const buffer = new ArrayBuffer(8); // 64 bits = 8 bytes
+	new DataView(buffer).setFloat64(0, value, true); // true = little-endian
+	return [...new Uint8Array(buffer)];
+};
+
 export const encodeString = (str: string): number[] => {
 	const bytes = [...new TextEncoder().encode(str)];
 	return [bytes.length, ...bytes];
@@ -69,6 +75,21 @@ export const emitSection = (
 	return new Uint8Array([sectionId, ...size, ...payload]);
 };
 
+export const typeCode = (t: "i32" | "i64" | "f32" | "f64"): number => {
+	switch (t) {
+		case "i32":
+			return 0x7f;
+		case "i64":
+			return 0x7e;
+		case "f32":
+			return 0x7d;
+		case "f64":
+			return 0x7c;
+		default:
+			throw new Error(`Unknown type: ${t}`);
+	}
+};
+
 export type RunFunction = (bytes: Uint8Array) => string[];
 export const loadWasm = async (): Promise<{ run: RunFunction }> => {
 	let memory: WebAssembly.Memory;
@@ -80,9 +101,15 @@ export const loadWasm = async (): Promise<{ run: RunFunction }> => {
 			const mem = new Uint8Array(memory.buffer, ptr, len);
 			output.push(decoder.decode(mem));
 		},
+		print_64: (val: number) => {
+			output.push(String(val));
+		},
 		println: (ptr: number, len: number) => {
 			const mem = new Uint8Array(memory.buffer, ptr, len);
 			output.push(`${decoder.decode(mem)}\n`);
+		},
+		println_64: (val: number) => {
+			output.push(`${val}\n`);
 		},
 	};
 
