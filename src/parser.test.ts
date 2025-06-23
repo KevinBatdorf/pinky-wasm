@@ -228,6 +228,70 @@ test("parses unary expressions", () => {
 		},
 	]);
 });
+
+test("parses exponential expressions", () => {
+	const input = "2 ^ 3";
+	const { tokens } = tokenize(input);
+	const { ast, error } = parse(tokens);
+
+	expect(error).toBeNull();
+	expect(ast.body).toEqual([
+		{
+			type: "ExpressionStatement",
+			expression: {
+				type: "BinaryExpression",
+				left: {
+					type: "NumberLiteral",
+					value: 2,
+					loc: { start: { line: 1, column: 1 }, end: { line: 1, column: 2 } },
+				},
+				operator: "^",
+				right: {
+					type: "NumberLiteral",
+					value: 3,
+					loc: { start: { line: 1, column: 5 }, end: { line: 1, column: 6 } },
+				},
+				loc: { start: { line: 1, column: 1 }, end: { line: 1, column: 6 } },
+			},
+			loc: { start: { line: 1, column: 1 }, end: { line: 1, column: 6 } },
+		},
+	]);
+});
+
+test("parses exponential expressions with unary op", () => {
+	const input = "2 ^ -3";
+	const { tokens } = tokenize(input);
+	const { ast, error } = parse(tokens);
+
+	expect(error).toBeNull();
+	expect(ast.body).toEqual([
+		{
+			type: "ExpressionStatement",
+			expression: {
+				type: "BinaryExpression",
+				left: {
+					type: "NumberLiteral",
+					value: 2,
+					loc: { start: { line: 1, column: 1 }, end: { line: 1, column: 2 } },
+				},
+				operator: "^",
+				right: {
+					type: "UnaryExpression",
+					operator: "-",
+					argument: {
+						type: "NumberLiteral",
+						value: 3,
+						loc: { start: { line: 1, column: 6 }, end: { line: 1, column: 7 } },
+					},
+					loc: { start: { line: 1, column: 5 }, end: { line: 1, column: 7 } },
+				},
+				loc: { start: { line: 1, column: 1 }, end: { line: 1, column: 7 } },
+			},
+			loc: { start: { line: 1, column: 1 }, end: { line: 1, column: 7 } },
+		},
+	]);
+});
+
 test("parses print statements", () => {
 	const input = 'print "foo"';
 	const { tokens } = tokenize(input);

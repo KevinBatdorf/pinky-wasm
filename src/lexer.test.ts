@@ -102,20 +102,19 @@ test("advance", () => {
 });
 
 test("should tokenize all punctuation and symbol tokens", () => {
-	const input = "(),.+-*/^%";
+	const input = "(),+-*/^%";
 	const { tokens } = tokenize(input);
 	const expected = [
 		{ type: "LPAREN", value: "(", start: 0, end: 1, column: 1, line: 1 },
 		{ type: "RPAREN", value: ")", start: 1, end: 2, column: 2, line: 1 },
 		{ type: "COMMA", value: ",", start: 2, end: 3, column: 3, line: 1 },
-		{ type: "DOT", value: ".", start: 3, end: 4, column: 4, line: 1 },
-		{ type: "PLUS", value: "+", start: 4, end: 5, column: 5, line: 1 },
-		{ type: "MINUS", value: "-", start: 5, end: 6, column: 6, line: 1 },
-		{ type: "STAR", value: "*", start: 6, end: 7, column: 7, line: 1 },
-		{ type: "SLASH", value: "/", start: 7, end: 8, column: 8, line: 1 },
-		{ type: "CARET", value: "^", start: 8, end: 9, column: 9, line: 1 },
-		{ type: "MOD", value: "%", start: 9, end: 10, column: 10, line: 1 },
-		{ type: "EOF", value: "", start: 10, end: 10, column: 11, line: 1 },
+		{ type: "PLUS", value: "+", start: 3, end: 4, column: 4, line: 1 },
+		{ type: "MINUS", value: "-", start: 4, end: 5, column: 5, line: 1 },
+		{ type: "STAR", value: "*", start: 5, end: 6, column: 6, line: 1 },
+		{ type: "SLASH", value: "/", start: 6, end: 7, column: 7, line: 1 },
+		{ type: "CARET", value: "^", start: 7, end: 8, column: 8, line: 1 },
+		{ type: "MOD", value: "%", start: 8, end: 9, column: 9, line: 1 },
+		{ type: "EOF", value: "", start: 9, end: 9, column: 10, line: 1 },
 	];
 	expect(tokens).toEqual(expected);
 });
@@ -128,6 +127,17 @@ test("should tokenize variable assignment and numbers", () => {
 		{ type: "NOT", value: "~", start: 5, end: 6, column: 6, line: 1 },
 		{ type: "NUMBER", value: "42", start: 6, end: 8, column: 7, line: 1 },
 		{ type: "EOF", value: "", start: 8, end: 8, column: 9, line: 1 },
+	]);
+});
+
+test("should tokenize variable assignment and float numbers with no leading 0", () => {
+	const input = "x := 0.42";
+	const { tokens } = tokenize(input);
+	expect(tokens).toEqual([
+		{ type: "IDENTIFIER", value: "x", start: 0, end: 1, column: 1, line: 1 },
+		{ type: "ASSIGN", value: ":=", start: 2, end: 4, column: 3, line: 1 },
+		{ type: "NUMBER", value: "0.42", start: 5, end: 9, column: 6, line: 1 },
+		{ type: "EOF", value: "", start: 9, end: 9, column: 10, line: 1 },
 	]);
 });
 

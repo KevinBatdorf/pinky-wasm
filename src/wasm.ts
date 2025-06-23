@@ -150,3 +150,80 @@ export const loadWasm = async (): Promise<{ run: RunFunction }> => {
 
 	return { run };
 };
+
+// biome-ignore format:
+// js/lua style modulus
+export const modFunctionBody = [
+    ...unsignedLEB(0), // 0 local variables
+    0x20, 0x00, // local.get 0 (left)
+    0x20, 0x01, // local.get 1 (right)
+    0x20, 0x00, // local.get 0 (left)
+    0x20, 0x01, // local.get 1 (right)
+    0xa3, // f64.div
+    0x9d, // f64.trunc
+    0xa2, // f64.mul
+    0xa1, // f64.sub => yields a - b * floor(a/b)
+    0x0b, // end
+];
+
+// biome-ignore format:
+export const powFunctionBody = [
+    ...unsignedLEB(3),           // 3 locals
+    0x01, typeCode("f64"),       // local[2]: result
+    0x01, typeCode("i32"),       // local[3]: exp_i32
+    0x01, typeCode("i32"),       // local[4]: counter
+
+      // If exp < 0, invert base and negate exp
+    0x20, 0x01,                // local.get 1 (exp)
+    0x44, ...encodeF64(0),     // f64.const 0
+    0x63,                      // f64.lt
+    0x04, 0x40,                // if
+        0x44, ...encodeF64(1), // f64.const 1
+        0x20, 0x00,            // local.get 0 (base)
+        0xa3,                  // f64.div
+        0x21, 0x00,            // local.set 0 (base = 1 / base)
+
+        0x20, 0x01,            // local.get 1 (exp)
+        0x9a,                  // f64.neg
+        0x21, 0x01,            // local.set 1 (exp = -exp)
+    0x0b,                      // end if
+
+    // result = base
+    0x20, 0x00,  // local.get 0 (base)
+    0x21, 0x02,  // local.set 2
+
+    // exp_i32 = trunc(exp)
+    0x20, 0x01,  // local.get 1 (exp)
+    0xaa,        // i32.trunc_f64_s
+    0x21, 0x03,  // local.set 3
+
+    // counter = 1
+    0x41, 0x01,  // i32.const 1
+    0x21, 0x04,  // local.set 4
+
+    // block
+    0x02, 0x40,
+        // loop
+        0x03, 0x40,
+            0x20, 0x04, // local.get 4 (counter)
+            0x20, 0x03, // local.get 3 (exp_i32)
+            0x4e,       // i32.ge_s
+            0x0d, 0x01, // br_if 1 (break outer block)
+
+            0x20, 0x02, // local.get 2 (result)
+            0x20, 0x00, // local.get 0 (base)
+            0xa2,       // f64.mul
+            0x21, 0x02, // local.set 2 (result *= base)
+
+            0x20, 0x04, // local.get 4 (counter)
+            0x41, 0x01, // i32.const 1
+            0x6a,       // i32.add
+            0x21, 0x04, // local.set 4 (counter++)
+
+            0x0c, 0x00, // br 0 (repeat loop)
+        0x0b,         // end loop
+    0x0b,           // end block
+
+    0x20, 0x02,     // local.get 2 (result)
+    0x0b            // end function
+];

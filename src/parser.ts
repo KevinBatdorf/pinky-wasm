@@ -529,7 +529,7 @@ const parseExponent = (state: ParserState): Expression => {
 	let left = parsePrimary(state);
 	while (match(state, "CARET")) {
 		const operator = previousToken(state).type;
-		const right = parsePrimary(state);
+		const right = parseExpression(state);
 		left = {
 			type: "BinaryExpression",
 			left,

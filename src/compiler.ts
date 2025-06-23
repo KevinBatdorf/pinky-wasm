@@ -8,6 +8,8 @@ import {
 	encodeF64,
 	typeCode,
 	nativeBinOps,
+	modFunctionBody,
+	powFunctionBody,
 } from "./wasm";
 
 export type CompilerErrorType = Error | null;
@@ -24,7 +26,11 @@ const importFunctions = [
 	{ name: "print_64", type: { params: ["f64"], results: [] } },
 	{ name: "println_64", type: { params: ["f64"], results: [] } },
 ] as const;
-const definedFunctions = [{ name: "main", type: { params: [], results: [] } }];
+const definedFunctions = [
+	{ name: "main", type: { params: [], results: [] } },
+	{ name: "mod", type: { params: ["f64", "f64"], results: ["f64"] } },
+	{ name: "pow", type: { params: ["f64", "f64"], results: ["f64"] } },
+] as const;
 const allFunctions = [...definedFunctions, ...importFunctions];
 // We can only add a type once, so we use a map to track them
 const typeMap = new Map<string, number>();
@@ -111,9 +117,7 @@ const _compile = (
 		0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
 	]);
 
-	// === Type section (only handles signature for print/println) ===
-	// TODO: imports are simple now but we could dynamically check import type
-	// and register them here later on
+	// === Type section (handles signature for print/println) ===
 	const typeSection = emitSection(
 		1,
 		// biome-ignore format:
@@ -124,8 +128,6 @@ const _compile = (
 	);
 
 	// === Import section (import print/println from env) ===
-	// TODO: these both point to the same type def, which is fine since
-	// our signatures are the same and only 2 imports
 	const importSection = emitSection(
 		2,
 		new Uint8Array([
@@ -146,12 +148,20 @@ const _compile = (
 		]),
 	);
 
-	// === Function section (1 function, pointing to type index 0) ===
+	// === Function section  ===
 	const funcSection = emitSection(
 		3,
 		new Uint8Array([
-			0x01, // 1 function
-			0x00, // type index 0
+			// loop over the defined functions and get their type indices
+			...unsignedLEB(definedFunctions.length),
+			...definedFunctions.flatMap((def) => {
+				const key = getTypeKey(def.type);
+				const typeIndex = typeMap.get(key);
+				if (typeIndex === undefined) {
+					throw new Error(`Type not found for function "${def.name}"`);
+				}
+				return unsignedLEB(typeIndex);
+			}),
 		]),
 	);
 
@@ -166,7 +176,7 @@ const _compile = (
 		]),
 	);
 
-	// === Export section (export "main") ===
+	// === Export section (export "main" and "memory") ===
 	const exportSection = emitSection(
 		7,
 		// biome-ignore format:
@@ -187,15 +197,19 @@ const _compile = (
 	);
 
 	// === Code section ===
-	const funcBody = generateBody(ast, strings);
+	const mainFunc = mainFuncBody(ast, strings);
 	const codeSection = emitSection(
 		10,
-		// biome-ignore format:
 		new Uint8Array([
-            0x01, // 1 function main()
-            ...unsignedLEB(funcBody.length),
-            ...funcBody
-        ]),
+			...unsignedLEB(definedFunctions.length),
+			...unsignedLEB(mainFunc.length), // main()
+			...mainFunc,
+			// todo: loop here?
+			...unsignedLEB(modFunctionBody.length),
+			...modFunctionBody,
+			...unsignedLEB(powFunctionBody.length),
+			...powFunctionBody,
+		]),
 	);
 
 	// === Data section ===
@@ -225,7 +239,7 @@ const _compile = (
 	]);
 };
 
-export const generateBody = (
+export const mainFuncBody = (
 	ast: AST,
 	strings: ReturnType<typeof createStringTable>,
 ): number[] => {
@@ -266,8 +280,14 @@ export const generateBody = (
 	];
 };
 
-export const isF64Expression = (expr: Expression): boolean =>
-	["NumberLiteral", "BinaryExpression"].includes(expr.type);
+const comparisonOps = new Set(["==", "~=", ">", ">=", "<", "<="]);
+export const isF64Expression = (expr: Expression): boolean => {
+	if (expr.type === "GroupingExpression")
+		return isF64Expression(expr.expression);
+	if (expr.type === "UnaryExpression") return isF64Expression(expr.argument);
+	return ["NumberLiteral", "BinaryExpression"].includes(expr.type);
+};
+
 const compileExpression = (
 	expr: Expression,
 	strings: ReturnType<typeof createStringTable>,
@@ -295,24 +315,25 @@ const compileExpression = (
 				0x41,
 				...signedLEB(expr.value ? 1 : 0), // treat as i32 for now
 			];
+		case "GroupingExpression":
+			return compileExpression(expr.expression, strings);
 		case "BinaryExpression": {
 			const left = compileExpression(expr.left, strings);
 			const right = compileExpression(expr.right, strings);
 			const opcode = nativeBinOps[expr.operator];
 			// Native operators supported for f64
 			if (opcode !== null) {
-				const isComparison = ["==", "~=", ">", ">=", "<", "<="].includes(
-					expr.operator,
-				);
-
-				// TODO: this converts to i32 for print support, which outputs 1/0
-				return isComparison
+				// comparing f64, f64 results in i32 so convert it back to f64
+				return comparisonOps.has(expr.operator)
 					? [...left, ...right, opcode, 0xb7] // f64.convert_i32_u
 					: [...left, ...right, opcode];
 			}
 			switch (expr.operator) {
 				case "%":
+					return [...left, ...right, 0x10, functionIndices.mod];
 				case "^":
+					// TODO throw if exp is not an integer
+					return [...left, ...right, 0x10, functionIndices.pow];
 				case "and":
 				case "or":
 					throw new Error("TODO");
@@ -320,6 +341,25 @@ const compileExpression = (
 					throw new Error(`Unsupported binary operator: ${expr.operator}`);
 			}
 		}
+		case "UnaryExpression": {
+			const argument = compileExpression(expr.argument, strings);
+			switch (expr.operator) {
+				case "+":
+					return argument;
+				case "-":
+					return [...argument, 0x9a]; // f64.neg
+				case "~":
+					return [
+						...argument,
+						0x44,
+						...encodeF64(0), // f64.const 0
+						0x61, // f64.eq (result is i32)
+						0xb7, // f64.convert_i32_u (convert i32 result back to f64)
+					];
+			}
+			break;
+		}
+
 		default:
 			throw new Error(`Unsupported expression type: ${expr.type}`);
 	}

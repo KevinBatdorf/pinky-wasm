@@ -8,7 +8,8 @@ export type TokenErrorType = null | {
 
 export const isAlpha = (char: string): boolean =>
 	(char >= "a" && char <= "z") || (char >= "A" && char <= "Z") || char === "_";
-export const isDigit = (char: string): boolean => char >= "0" && char <= "9";
+export const isDigit = (char: string): boolean =>
+	(char >= "0" && char <= "9") || char === ".";
 export const isAlphaNumeric = (char: string): boolean =>
 	isAlpha(char) || isDigit(char);
 export const isWhitespace = (char: string): boolean =>
@@ -88,7 +89,6 @@ export const tokenize = (
 				break;
 			case "(":
 			case ")":
-			case ".":
 			case ",":
 			case "+":
 			case "*":

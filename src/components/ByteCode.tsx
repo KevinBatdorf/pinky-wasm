@@ -12,9 +12,11 @@ export const ByteCode = ({
 	if (!bytes) return null;
 	return (
 		<div className="flex-grow pb-60">
-			<div className="bg-gray-900 p-1 text-xs rounded mb-1 text-gray-400 whitespace-normal">
-				{strings ? new TextDecoder().decode(strings) : "No strings available"}
-			</div>
+			{strings?.length ? (
+				<div className="bg-gray-900 p-1 text-xs rounded mb-1 text-gray-400 whitespace-normal">
+					{new TextDecoder().decode(strings)}
+				</div>
+			) : null}
 			<div className="flex flex-wrap gap-1 text-xs">
 				{Array.from(bytes)?.map((byte, i) => (
 					<span

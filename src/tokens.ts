@@ -3,7 +3,6 @@ export type TokenType =
 	| "RPAREN"
 	| "COMMA"
 	| "COMMENT"
-	| "DOT"
 	| "PLUS"
 	| "MINUS"
 	| "STAR"
@@ -74,7 +73,6 @@ export const tokenTypes: { [key: string]: TokenType } = {
 	"(": "LPAREN",
 	")": "RPAREN",
 	",": "COMMA",
-	".": "DOT",
 	"+": "PLUS",
 	"-": "MINUS",
 	"*": "STAR",
