@@ -1,16 +1,21 @@
 export const example = `print "hello "
 println "world"
+x := 5
+y := "3"
+z := 10
 println ""
-println 1
+print "x + z = "
+println x * z
 println true
 println 2 * 6
 print "4 % 3 = "
 println 4 % 3
 print "2 ^ 5 = "
 println 2 ^ 5
+println 2 ^ .5 -- unsupported for now
 println 10 ^ -1
 println 2 / 6
-println 2 > 4 -- for now this will print 1/0
+println 2 > 4 -- will print 1/0
 print "heck yeah!"
 -- right now only print/println are implemented
 -- for the wasm compiler

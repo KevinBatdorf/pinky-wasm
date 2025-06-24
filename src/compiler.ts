@@ -13,11 +13,6 @@ import {
 } from "./wasm";
 
 export type CompilerErrorType = Error | null;
-// Used for passing around types and not worrying about location info
-const dummyLoc = {
-	start: { line: 0, column: 0 },
-	end: { line: 0, column: 0 },
-};
 
 // Set up function signatures
 const importFunctions = [
@@ -40,7 +35,7 @@ const getTypeKey = (type: {
 	params: readonly string[];
 	results: readonly string[];
 }) => `(${type.params.join(",")})=>(${type.results.join(",")})`;
-
+// Set types for all functions
 for (const imp of allFunctions) {
 	const key = getTypeKey(imp.type);
 	if (typeMap.has(key)) continue;
@@ -59,6 +54,99 @@ importFunctions.forEach((imp, i) => {
 definedFunctions.forEach((def, i) => {
 	functionIndices[def.name] = importFunctions.length + i;
 });
+
+// Manage variables
+type VarType = "f64" | "i32"; // (number/bool) | string
+type VarInfo = { type: VarType; name: string; index?: number };
+// Apply the index above after we know all variables
+const assignLocalIndices = (): Map<VarType, number> => {
+	const counts = new Map<VarType, number>();
+	const vars: { varInfo: VarInfo; type: VarType; slots: number }[] = [];
+
+	// First pass: collect and count
+	for (const scope of scopes) {
+		for (const [, varInfo] of scope.entries()) {
+			if (varInfo.index !== undefined) continue;
+			const slots = varInfo.type === "i32" ? 2 : 1;
+			counts.set(varInfo.type, (counts.get(varInfo.type) ?? 0) + slots);
+			vars.push({ varInfo, type: varInfo.type, slots });
+		}
+	}
+
+	// Assign indices sequentially, grouped by type order
+	const typeOrder = Array.from(counts.keys());
+	const typeStarts = new Map<VarType, number>();
+	let offset = 0;
+	for (const type of typeOrder) {
+		typeStarts.set(type, offset);
+		offset += counts.get(type) || 0;
+	}
+
+	// Assign indices in declaration order
+	const typeOffsets = new Map(typeStarts);
+	for (const type of typeOrder) {
+		for (const { varInfo, type: t, slots } of vars) {
+			if (t !== type) continue;
+			varInfo.index = typeOffsets.get(type) || 0;
+			typeOffsets.set(type, varInfo.index + slots);
+		}
+	}
+
+	return counts;
+};
+
+type Patch = {
+	name: string; // name of the variable to patch
+	offset: number; // offset in the bytecode to patch
+	type: VarType; // type of the variable, if known
+	slot?: number; // delta relative to offset
+};
+const placeholder = 0xff;
+// We need placeholders to manage type indexes
+const patches: Patch[] = [];
+const applyPatches = (instructions: number[]) => {
+	for (const patch of patches) {
+		const scope = findScopeForVar(patch.name);
+		if (!scope) throw new Error(`Scope not found for ${patch.name}`);
+		const varInfo = scope.get(patch.name);
+		if (!varInfo || varInfo.index === undefined)
+			throw new Error(`Unresolved variable index for "${patch.name}"`);
+		const encoded = unsignedLEB(varInfo.index + (patch.slot ?? 0));
+		instructions.splice(patch.offset, 1, ...encoded);
+	}
+	return instructions;
+};
+type Scope = Map<string, VarInfo>;
+let scopes: Scope[] = [new Map()]; // global scope
+// const enterScope = () => scopes.push(new Map());
+// const exitScope = () => scopes.pop();
+
+const findScopeForVar = (name: string): Scope | null =>
+	scopes
+		.slice()
+		.reverse()
+		.find((scope) => scope.has(name)) ?? scopes[0]; // global scope fallback
+const declareVar = (
+	name: string,
+	type: VarType,
+	isLocal: boolean,
+): VarInfo | null => {
+	const scope = isLocal ? scopes[scopes.length - 1] : findScopeForVar(name);
+	if (!scope) throw new Error(`No scope found for variable "${name}"`);
+	if (scope.has(name))
+		throw new Error(`Variable "${name}" already declared in this scope`);
+	const varInfo: VarInfo = { name, type };
+	scope.set(name, varInfo);
+	return varInfo;
+};
+const getVar = (name: string): VarInfo => {
+	const varInfo = findScopeForVar(name)?.get(name);
+	if (!varInfo)
+		throw new Error(`Variable "${name}" not found in current scope`);
+	return varInfo;
+};
+const getVarType = (expr: Expression): VarType =>
+	expr.type === "StringLiteral" ? "i32" : "f64";
 
 // Create a string table to manage string offsets in the WASM binary
 const createStringTable = () => {
@@ -112,6 +200,10 @@ const _compile = (
 	ast: AST,
 	strings: ReturnType<typeof createStringTable>,
 ): Uint8Array => {
+	// reset patches
+	patches.length = 0;
+	// Reset scopes for each compile
+	scopes = [new Map()]; // reset to global scope
 	// WASM magic + version
 	const header = new Uint8Array([
 		0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
@@ -198,6 +290,7 @@ const _compile = (
 
 	// === Code section ===
 	const mainFunc = mainFuncBody(ast, strings);
+	console.log("Main function body:", mainFunc);
 	const codeSection = emitSection(
 		10,
 		new Uint8Array([
@@ -247,35 +340,97 @@ export const mainFuncBody = (
 
 	for (const stmt of ast.body) {
 		switch (stmt.type) {
-			case "PrintlnStatement":
-				instructions.push(...compileForPrint(stmt.expression, strings));
+			case "PrintlnStatement": {
+				const { bytes, patches: p } = compileExpression(
+					stmt.expression,
+					strings,
+				);
+				instructions.push(...bytes);
+				for (const patch of p ?? []) {
+					patches.push({
+						...patch,
+						offset: instructions.length - bytes.length + patch.offset,
+					});
+				}
 				if (isF64Expression(stmt.expression)) {
 					instructions.push(0x10, functionIndices.println_64);
 					break;
 				}
 				instructions.push(0x10, functionIndices.println);
 				break;
-
-			case "PrintStatement":
-				instructions.push(...compileForPrint(stmt.expression, strings));
+			}
+			case "PrintStatement": {
+				const { bytes, patches: p } = compileExpression(
+					stmt.expression,
+					strings,
+				);
+				instructions.push(...bytes);
+				for (const patch of p ?? []) {
+					patches.push({
+						...patch,
+						offset: instructions.length - bytes.length + patch.offset,
+					});
+				}
 				if (isF64Expression(stmt.expression)) {
 					instructions.push(0x10, functionIndices.print_64);
 					break;
 				}
 				instructions.push(0x10, functionIndices.print);
 				break;
-
-			case "ExpressionStatement":
-				console.log({ stmt });
+			}
+			case "LocalAssignStatement":
+			case "AssignStatement": {
+				const { identifier, expression } = stmt;
+				const isLocal = stmt.type === "LocalAssignStatement";
+				const type = getVarType(expression);
+				const varInfo = declareVar(identifier.name, type, isLocal);
+				const { bytes } = compileExpression(expression, strings);
+				if (!varInfo) {
+					throw new Error(`Failed to declare variable "${identifier.name}"`);
+				}
+				// biome-ignore format:
+				if (type === "i32") {
+					instructions.push(bytes[0], bytes[1])
+					instructions.push(0x21, placeholder)
+					patches.push({
+						name: identifier.name,
+						offset: instructions.length - 1,
+						type,
+					});
+					instructions.push(bytes[2], bytes[3])
+					instructions.push(0x21, placeholder)
+                    patches.push({
+                        name: identifier.name,
+                        offset: instructions.length - 1,
+                        type,
+                        slot: 1, // next slot for i32
+                    });
+					break;
+				}
+				instructions.push(...bytes, 0x21, placeholder);
+				patches.push({
+					name: identifier.name,
+					offset: instructions.length - 1,
+					type,
+				});
 				break;
+			}
 			default:
 				throw new Error(`Unsupported statement type: ${stmt.type}`);
 		}
 	}
 
+	// Set up locals
+	const types = assignLocalIndices();
+	const localDecals: number[] = [];
+	for (const [type, count] of types.entries()) {
+		localDecals.push(...unsignedLEB(count), typeCode(type));
+	}
+	console.log({ instructions, localDecals, types, patches });
 	return [
-		...unsignedLEB(0), // no local variables
-		...instructions,
+		...unsignedLEB(types.size),
+		...localDecals,
+		...applyPatches(instructions),
 		0x0b,
 	];
 };
@@ -285,55 +440,95 @@ export const isF64Expression = (expr: Expression): boolean => {
 	if (expr.type === "GroupingExpression")
 		return isF64Expression(expr.expression);
 	if (expr.type === "UnaryExpression") return isF64Expression(expr.argument);
-	return ["NumberLiteral", "BinaryExpression"].includes(expr.type);
+	if (expr.type === "Identifier") {
+		const varInfo = getVar(expr.name);
+		return varInfo.type === "f64";
+	}
+	return ["NumberLiteral", "BooleanLiteral", "BinaryExpression"].includes(
+		expr.type,
+	);
 };
-
 const compileExpression = (
 	expr: Expression,
 	strings: ReturnType<typeof createStringTable>,
-): number[] => {
+): { bytes: number[]; patches?: Patch[] } => {
 	const textEncoder = new TextEncoder();
 	switch (expr.type) {
 		case "StringLiteral": {
 			const offset = strings.getOffset(String(expr.value));
 			const length = textEncoder.encode(String(expr.value)).length;
-			return [
-				0x41,
-				...signedLEB(offset), // i32.const offset
-				0x41,
-				...signedLEB(length), // i32.const length
-			];
+			return {
+				bytes: [
+					0x41,
+					...signedLEB(offset), // i32.const offset
+					0x41,
+					...signedLEB(length), // i32.const length
+				],
+			};
 		}
 		case "NumberLiteral": {
-			return [
-				0x44,
-				...encodeF64(expr.value), // f64.const value
-			];
+			return {
+				bytes: [
+					0x44,
+					...encodeF64(expr.value), // f64.const value
+				],
+			};
 		}
-		case "BooleanLiteral":
-			return [
-				0x41,
-				...signedLEB(expr.value ? 1 : 0), // treat as i32 for now
-			];
+		case "BooleanLiteral": {
+			const value = expr.value ? 1 : 0;
+			return {
+				bytes: [0x44, ...encodeF64(value)],
+			};
+		}
+		case "Identifier": {
+			const { name, type } = getVar(expr.name);
+			if (type === "i32") {
+				return {
+					bytes: [0x20, placeholder, 0x20, placeholder + 1],
+					patches: [
+						{ name, offset: 1, type },
+						{ name, offset: 3, type, slot: 1 },
+					],
+				};
+			}
+			return {
+				bytes: [0x20, placeholder],
+				patches: [{ name, offset: 1, type }],
+			};
+		}
 		case "GroupingExpression":
 			return compileExpression(expr.expression, strings);
 		case "BinaryExpression": {
 			const left = compileExpression(expr.left, strings);
 			const right = compileExpression(expr.right, strings);
 			const opcode = nativeBinOps[expr.operator];
+			// set the offset of the right side to the end of the left side
+			const rightPatches = (right.patches ?? []).map((p) => ({
+				...p,
+				offset: p.offset + left.bytes.length,
+			}));
 			// Native operators supported for f64
 			if (opcode !== null) {
 				// comparing f64, f64 results in i32 so convert it back to f64
-				return comparisonOps.has(expr.operator)
-					? [...left, ...right, opcode, 0xb7] // f64.convert_i32_u
-					: [...left, ...right, opcode];
+				return {
+					bytes: comparisonOps.has(expr.operator)
+						? [...left.bytes, ...right.bytes, opcode, 0xb7] // f64.convert_i32_u
+						: [...left.bytes, ...right.bytes, opcode],
+					patches: [...(left.patches ?? []), ...rightPatches],
+				};
 			}
 			switch (expr.operator) {
 				case "%":
-					return [...left, ...right, 0x10, functionIndices.mod];
+					return {
+						bytes: [...left.bytes, ...right.bytes, 0x10, functionIndices.mod],
+						patches: [...(left.patches ?? []), ...rightPatches],
+					};
 				case "^":
 					// TODO throw if exp is not an integer
-					return [...left, ...right, 0x10, functionIndices.pow];
+					return {
+						bytes: [...left.bytes, ...right.bytes, 0x10, functionIndices.pow],
+						patches: [...(left.patches ?? []), ...rightPatches],
+					};
 				case "and":
 				case "or":
 					throw new Error("TODO");
@@ -347,15 +542,21 @@ const compileExpression = (
 				case "+":
 					return argument;
 				case "-":
-					return [...argument, 0x9a]; // f64.neg
+					return {
+						bytes: [...argument.bytes, 0x9a],
+						patches: argument.patches,
+					};
 				case "~":
-					return [
-						...argument,
-						0x44,
-						...encodeF64(0), // f64.const 0
-						0x61, // f64.eq (result is i32)
-						0xb7, // f64.convert_i32_u (convert i32 result back to f64)
-					];
+					return {
+						bytes: [
+							...argument.bytes,
+							0x44,
+							...encodeF64(0), // f64.const 0
+							0x61, // f64.eq (result is i32)
+							0xb7, // f64.convert_i32_u (convert i32 result back to f64)
+						],
+						patches: argument.patches,
+					};
 			}
 			break;
 		}
@@ -363,18 +564,4 @@ const compileExpression = (
 		default:
 			throw new Error(`Unsupported expression type: ${expr.type}`);
 	}
-};
-
-const compileForPrint = (
-	expr: Expression,
-	strings: ReturnType<typeof createStringTable>,
-): number[] => {
-	if (expr.type === "BooleanLiteral") {
-		const str = expr.value ? "true" : "false";
-		return compileExpression(
-			{ type: "StringLiteral", value: str, loc: dummyLoc },
-			strings,
-		);
-	}
-	return compileExpression(expr, strings);
 };

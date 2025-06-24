@@ -75,14 +75,10 @@ export const emitSection = (
 	return new Uint8Array([sectionId, ...size, ...payload]);
 };
 
-export const typeCode = (t: "i32" | "i64" | "f32" | "f64"): number => {
+export const typeCode = (t: "i32" | "f64"): number => {
 	switch (t) {
 		case "i32":
 			return 0x7f;
-		case "i64":
-			return 0x7e;
-		case "f32":
-			return 0x7d;
 		case "f64":
 			return 0x7c;
 		default:

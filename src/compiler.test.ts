@@ -72,7 +72,7 @@ test("print and println with numbers", async () => {
 	expect(output.join("")).toBe("510\n");
 });
 
-test("prints boolean values", async () => {
+test("prints boolean values as 1 and 0", async () => {
 	const input = `print true
                    println false`;
 	const { tokens } = tokenize(input);
@@ -80,7 +80,7 @@ test("prints boolean values", async () => {
 	const { bytes, error } = compile(ast);
 	const output = run(bytes);
 	expect(error).toBeNull();
-	expect(output.join("")).toBe("truefalse\n");
+	expect(output.join("")).toBe("10\n");
 });
 
 test("prints binary operators", async () => {
@@ -140,4 +140,20 @@ test("prints exponentiation operators", async () => {
 	const output = run(bytes);
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("8250.1-8-9");
+});
+
+test("assigns variables and prints them", async () => {
+	const input = `x := 5
+                   y := "hello"
+                   z := 10
+                   print x
+                   println y
+                   println x + z
+                   print z`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("5hello\n15\n10");
 });
