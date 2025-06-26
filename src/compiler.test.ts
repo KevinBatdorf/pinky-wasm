@@ -3,7 +3,7 @@ import { compile } from "./compiler";
 import { tokenize } from "./lexer";
 import { parse } from "./parser";
 import { loadWasm, type RunFunction } from "./wasm";
-import fs from "node:fs";
+// import fs from "node:fs";
 
 declare global {
 	var run: RunFunction;
