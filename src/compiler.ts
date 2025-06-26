@@ -12,6 +12,7 @@ import {
 	boxNumberFunctionBody,
 	boxBooleanFunctionBody,
 	boxStringFunctionBody,
+	isTruthyFunctionBody,
 	unboxNumber,
 } from "./wasm";
 
@@ -29,6 +30,7 @@ const definedFunctions = [
 	{ name: "box_number", type: { params: ["f64"], results: ["i32"] } },
 	{ name: "box_bool", type: { params: ["i32"], results: ["i32"] } },
 	{ name: "box_string", type: { params: ["i32", "i32"], results: ["i32"] } }, // i32 ptr, length
+	{ name: "is_truthy", type: { params: ["i32"], results: ["i32"] } },
 ] as const;
 const allFunctions = [...definedFunctions, ...importFunctions];
 // We can only add a type once, so we use a map to track them
@@ -87,6 +89,14 @@ const getVar = (name: string): VarInfo => {
 		throw new Error(`Variable "${name}" not found in current scope`);
 	return varInfo;
 };
+// For temporary variables, we use a special index
+const getScratchIndex = (() => {
+	let index: number | null = null;
+	return () => {
+		if (index === null) index = nextLocalIndex++;
+		return index;
+	};
+})();
 
 // Create a string table to manage string offsets in the WASM binary
 const createStringTable = () => {
@@ -147,7 +157,7 @@ const _compile = (
 		0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
 	]);
 
-	// === Type section (handles signature for print/println) ===
+	// Type section (handles signature for print/println)
 	const typeSection = emitSection(
 		1,
 		// biome-ignore format:
@@ -157,7 +167,7 @@ const _compile = (
         ]),
 	);
 
-	// === Import section (import print/println from env) ===
+	// Import section (import print/println from env)
 	const importSection = emitSection(
 		2,
 		new Uint8Array([
@@ -178,7 +188,7 @@ const _compile = (
 		]),
 	);
 
-	// === Function section  ===
+	// Function section
 	const funcSection = emitSection(
 		3,
 		new Uint8Array([
@@ -195,7 +205,7 @@ const _compile = (
 		]),
 	);
 
-	// === Memory section (1 memory with min 1 page) ===
+	// Memory section (1 memory with min 1 page)
 	const memorySection = emitSection(
 		5, // memory section id
 		// biome-ignore format:
@@ -206,20 +216,7 @@ const _compile = (
         ]),
 	);
 
-	// === global heap pointer, mutable i32, init to 1024 ===
-	const globalSection = emitSection(
-		6,
-		// biome-ignore format:
-		new Uint8Array([
-            0x01, // one global
-            typeCode("i32"),
-            0x01,  // mutable
-            0x41, 0x80, 0x08, // i32.const 1024 (LEB128 for 1024)
-            0x0b, // end
-        ]),
-	);
-
-	// === Export section (export "main" and "memory") ===
+	// Export section (export "main" and "memory")
 	const exportSection = emitSection(
 		7,
 		// biome-ignore format:
@@ -239,7 +236,7 @@ const _compile = (
         ]),
 	);
 
-	// === Code section ===
+	// Code section
 	const mainFunc = mainFuncBody(ast, strings);
 	console.log("Main function body:", mainFunc);
 	const codeSection = emitSection(
@@ -259,10 +256,12 @@ const _compile = (
 			...boxBooleanFunctionBody,
 			...unsignedLEB(boxStringFunctionBody.length),
 			...boxStringFunctionBody,
+			...unsignedLEB(isTruthyFunctionBody.length),
+			...isTruthyFunctionBody,
 		]),
 	);
 
-	// === Data section ===
+	// Data section
 	const stringBytes = strings.getBytes();
 	const dataSection = emitSection(
 		11,
@@ -274,6 +273,20 @@ const _compile = (
             0x0b, // end
             ...unsignedLEB(stringBytes.length),
             ...stringBytes,
+        ]),
+	);
+
+	// This is listed out of order becasue we need to calc the heap size
+	// global heap pointer, mutable i32, init to 1024
+	const globalSection = emitSection(
+		6,
+		// biome-ignore format:
+		new Uint8Array([
+            0x01, // one global
+            typeCode("i32"),
+            0x01,  // mutable
+            0x41, ...unsignedLEB(stringBytes.length + 1),
+            0x0b, // end
         ]),
 	);
 
@@ -391,9 +404,9 @@ const compileExpression = (
 				// comparing f64, f64 results in i32 so convert it back to f64
 				if (comparisonOps.has(expr.operator)) {
 					ops.push(0x10, functionIndices.box_bool); // call box_bool → i32 ptr
-				} else {
-					ops.push(0x10, functionIndices.box_number); // call box_number → i32 ptr
+					return ops;
 				}
+				ops.push(0x10, functionIndices.box_number); // call box_number → i32 ptr
 				return ops;
 			}
 			switch (expr.operator) {
@@ -414,9 +427,35 @@ const compileExpression = (
                         0x10, functionIndices.pow,
                         0x10, functionIndices.box_number,
                     ];
-				case "and":
+				case "and": {
+					const scratch = getScratchIndex();
+					// biome-ignore format:
+					return [
+                        ...left,                           // evaluate A
+                        0x21, ...unsignedLEB(scratch),     // local.set scratch
+                        0x20, ...unsignedLEB(scratch),     // local.get scratch
+                        0x10, functionIndices.is_truthy,   // call is_truthy
+                        0x04, 0x7f,                        // if (result i32)
+                            ...right,                      // else: evaluate and return B
+                        0x05,                              // else
+                            0x20, ...unsignedLEB(scratch), // then: return A (scratch)
+                        0x0b,                              // end
+                    ];
+				}
 				case "or": {
-					throw new Error("TODO");
+					const scratch = getScratchIndex();
+					// biome-ignore format:
+					return [
+                        ...left,                           // evaluate A
+                        0x21, ...unsignedLEB(scratch),     // local.set scratch
+                        0x20, ...unsignedLEB(scratch),     // local.get scratch
+                        0x10, functionIndices.is_truthy,   // call is_truthy
+                        0x04, 0x7f,                        // if (result i32)
+                            0x20, ...unsignedLEB(scratch), // then: return A (scratch)
+                        0x05,                              // else
+                            ...right,                      // else: evaluate and return B
+                        0x0b,                              // end
+                    ];
 				}
 				default:
 					throw new Error(`Unsupported binary operator: ${expr.operator}`);

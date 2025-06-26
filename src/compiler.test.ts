@@ -3,6 +3,7 @@ import { compile } from "./compiler";
 import { tokenize } from "./lexer";
 import { parse } from "./parser";
 import { loadWasm, type RunFunction } from "./wasm";
+import fs from "node:fs";
 
 declare global {
 	var run: RunFunction;
@@ -12,6 +13,20 @@ beforeAll(async () => {
 	const { run } = await loadWasm();
 	globalThis.run = run;
 });
+
+// test.only("prints to wasm binary file", async () => {
+// 	const input = `println "jd" or "hello" -- hello
+// println 1 or 2 -- 2
+// println true or 7 -- true
+// println "jd" and "hello" -- jd
+// println 1 and 2 -- 1
+// println true and 7 -- 7`;
+// 	const { tokens } = tokenize(input);
+// 	const { ast } = parse(tokens);
+// 	const { bytes, error } = compile(ast);
+// 	fs.writeFileSync("test.wasm", bytes);
+// 	expect(error).toBeNull();
+// });
 
 test("println hello world", async () => {
 	const input = 'println "hello world"';
@@ -158,26 +173,38 @@ test("assigns variables and prints them", async () => {
 	expect(output.join("")).toBe("5hello\n15\n10");
 });
 
-// test("short circuits on and & or", async () => {
-// 	const input = `print true and false
-//                    print false or true
-//                    print true or false`;
-// 	const { tokens } = tokenize(input);
-// 	const { ast } = parse(tokens);
-// 	const { bytes, error } = compile(ast);
-// 	const output = run(bytes);
-// 	expect(error).toBeNull();
-// 	expect(output.join("")).toBe("011");
-// });
+test("short circuits on and & or", async () => {
+	const input = `print true and false
+                   print false or true
+                   print true or false`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("falsetruetrue");
+});
 
-// test("short circuits on and & or with values", async () => {
-// 	const input = `print true and 7
-//                    print false or "hello"
-//                    print 1 or 2`;
-// 	const { tokens } = tokenize(input);
-// 	const { ast } = parse(tokens);
-// 	const { bytes, error } = compile(ast);
-// 	const output = run(bytes);
-// 	expect(error).toBeNull();
-// 	expect(output.join("")).toBe("7hello1");
-// });
+test("short circuits on and & or with values", async () => {
+	const input = `print true and 7
+                   print false or "hello"
+                   print 1 or 2`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("7hello1");
+});
+
+test("chains and/or with values", async () => {
+	const input = `print "foo" and "bar" and "hello" -- hello
+                   print false or 0 or 2 -- 2
+                   print true and 0 or 2 -- 2`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("hello22");
+});
