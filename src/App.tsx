@@ -87,6 +87,7 @@ function App() {
 		const now = performance.now();
 		const { bytes, meta, error } = compile(ast);
 		// console.log({ bytes, meta, error });
+
 		return {
 			bytes,
 			strings: meta.strings,
@@ -169,7 +170,7 @@ function App() {
             sm:grid-cols-2
             md:grid-cols-[1fr_13.55rem_13.55rem]
             lg:grid-cols-[13.55rem_1fr_13.55rem_13.55rem]
-            xl:grid-cols-[13.55rem_1fr_13.55rem_13.55rem_0.5fr]
+            xl:grid-cols-[13.55rem_1fr_0.5fr_13.55rem_13.55rem]
 
             grid-rows-5
             sm:grid-rows-3
@@ -223,7 +224,7 @@ function App() {
                 row-span-1
                 lg:row-span-2
                 xl:row-span-1
-                md:row-start-1
+                md:row-start-2
                 "
 					>
 						<div className="flex items-center justify-between bg-black">
@@ -249,58 +250,7 @@ function App() {
 
                 lg:row-span-2
                 xl:row-span-1
-                md:row-start-2
-                lg:row-start-1
-                "
-					>
-						<div className="flex items-center justify-between text-sm bg-black">
-							<span>ast</span>
-							<span className="text-xs text-gray-500">
-								({astPerf.toFixed(2)}ms)
-							</span>
-						</div>
-						<div className="selection:bg-blue-500 selection:text-black overflow-x-auto overflow-y-auto">
-							{ast && (
-								<ASTComponent
-									ast={ast}
-									error={astError}
-									handleHover={handleHover}
-									handleLeave={handleLeave}
-								/>
-							)}
-						</div>
-					</div>
-					<div
-						className="text-sm p-1 h-screen md:h-full border-gray-800 sm:border-r overflow-hidden flex flex-col
-                sm:col-start-1
-                md:col-start-3
-                lg:col-start-4
-
-                sm:row-start-3
                 md:row-start-1
-                lg:row-span-1
-                "
-					>
-						<div className="flex items-center justify-between text-sm bg-black">
-							<span>wasm</span>
-							<span className="text-xs text-gray-500">
-								(wip {compilerPerf.toFixed(2)}ms)
-							</span>
-						</div>
-						<pre className="selection:bg-blue-700 selection:text-white overflow-x-hidden overflow-y-auto flex-grow whitespace-pre-wrap">
-							<ByteCode bytes={bytes} strings={strings} error={compilerError} />
-						</pre>
-					</div>
-					<div
-						className="flex flex-col text-sm p-1 h-screen md:h-full border-gray-800 md:border-t xl:border-t-0 overflow-hidden
-                sm:col-start-2
-                md:col-start-3
-                lg:col-start-4
-                xl:col-start-5
-
-                sm:row-start-3
-                md:row-start-2
-                lg:row-span-1
                 "
 					>
 						<div className="flex items-center justify-between text-sm bg-black">
@@ -327,6 +277,56 @@ function App() {
 										))}
 								</div>
 							)}
+						</pre>
+					</div>
+					<div
+						className="text-sm p-1 h-screen md:h-full border-gray-800 sm:border-r overflow-hidden flex flex-col
+                sm:col-start-1
+                md:col-start-3
+                lg:col-start-4
+
+                sm:row-start-3
+                md:row-start-1
+                lg:row-span-1
+                "
+					>
+						<div className="flex items-center justify-between text-sm bg-black">
+							<span>ast</span>
+							<span className="text-xs text-gray-500">
+								({astPerf.toFixed(2)}ms)
+							</span>
+						</div>
+						<div className="selection:bg-blue-500 selection:text-black overflow-x-auto overflow-y-auto">
+							{ast && (
+								<ASTComponent
+									ast={ast}
+									error={astError}
+									handleHover={handleHover}
+									handleLeave={handleLeave}
+								/>
+							)}
+						</div>
+					</div>
+					<div
+						className="flex flex-col text-sm p-1 h-screen md:h-full border-gray-800 md:border-t xl:border-t-0 overflow-hidden
+                sm:col-start-2
+                md:col-start-3
+                lg:col-start-4
+                xl:col-start-5
+
+                sm:row-start-3
+                md:row-start-2
+                lg:row-span-1
+                "
+					>
+						<div className="flex items-center justify-between text-sm bg-black">
+							<span>wasm bytecode</span>
+							<span className="text-xs text-gray-500">
+								(wip {compilerPerf.toFixed(2)}ms)
+							</span>
+						</div>
+						<pre className="selection:bg-blue-700 selection:text-white overflow-x-hidden overflow-y-auto flex-grow whitespace-pre-wrap">
+							<ByteCode bytes={bytes} strings={strings} error={compilerError} />
 						</pre>
 					</div>
 				</div>

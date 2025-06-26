@@ -8,51 +8,13 @@ export const unsignedLEB = (value: number): number[] => {
 	let v = value >>> 0;
 	do {
 		// Take the least significant 7 bits (mask with 0x7f = 01111111)
-		let byte = v & 0x7f;
+		let byte = v & typeCode("i32");
 		// Shift value right by 7 bits to get the rest for the next round
 		v >>>= 7;
 		// If there's anything left, set high bit (0x80 = 10000000) to say: "more bytes follow"
 		if (v !== 0) byte |= 0x80;
 		bytes.push(byte);
 	} while (v !== 0);
-	return bytes;
-};
-
-// Encode a signed number as LEB128 (Little Endian Base 128)
-// This is used for signed integer literals in WebAssembly (e.g., i32.const, i64.const)
-// LEB128 stores integers in a variable-length format, 7 bits per byte
-// The 8th bit (0x80) marks whether another byte follows
-// For signed numbers, sign-extension must be preserved during decoding
-export const signedLEB = (value: number): number[] => {
-	const bytes: number[] = [];
-	let v = value;
-	do {
-		// Grab the least significant 7 bits of the current value
-		let byte = v & 0x7f;
-		// Arithmetic right shift to preserve the sign bit during shift
-		// This makes `-1 >> 7 === -1`, unlike logical shift which would yield a positive
-		const shifted = v >> 7;
-		// Extract the sign bit of the current 7-bit chunk (bit 6)
-		const signBit = byte & 0x40;
-		// Decide whether we need to keep encoding more bytes
-		// The goal is to stop if shifting has reached:
-		//   - 0 and the sign bit is clear
-		//   - -1 and the sign bit is set
-		const more = !(
-			(shifted === 0 && signBit === 0) ||
-			(shifted === -1 && signBit !== 0)
-		);
-		// If we still need more bytes, set the high bit (0x80)
-		if (more) byte |= 0x80;
-		bytes.push(byte);
-		v = shifted; // Prepare for the next 7 bits
-	} while (
-		// Repeat until all significant bits are encoded *and* the sign bit is correctly preserved
-		!(
-			(v === 0 && (bytes[bytes.length - 1] & 0x40) === 0) ||
-			(v === -1 && (bytes[bytes.length - 1] & 0x40) !== 0)
-		)
-	);
 	return bytes;
 };
 
@@ -117,19 +79,41 @@ export const loadWasm = async (): Promise<{ run: RunFunction }> => {
 	const decoder = new TextDecoder();
 
 	const env = {
-		print: (ptr: number, len: number) => {
-			const mem = new Uint8Array(memory.buffer, ptr, len);
-			output.push(decoder.decode(mem));
+		print: (boxPtr: number) => {
+			const buf = new DataView(memory.buffer);
+			// 1) read the 4-byte tag
+			const tag = buf.getInt32(boxPtr, true);
+			switch (tag) {
+				case 0:
+					// null/undefined: no output
+					return;
+				case 1: {
+					// number: read 8-byte f64 at offset+4
+					const num = buf.getFloat64(boxPtr + 4, true);
+					output.push(String(num));
+					break;
+				}
+				case 2: {
+					// string: read offset (i32) and length (i32)
+					const strOff = buf.getInt32(boxPtr + 4, true);
+					const strLen = buf.getInt32(boxPtr + 12, true);
+					const bytes = new Uint8Array(memory.buffer, strOff, strLen);
+					output.push(decoder.decode(bytes));
+					break;
+				}
+				case 3: {
+					// boolean: read 4-byte i32 at offset+4
+					const bool = buf.getInt32(boxPtr + 4, true);
+					output.push(bool ? "true" : "false");
+					break;
+				}
+				default:
+					throw new Error(`Unknown tag: ${tag}`);
+			}
 		},
-		print_64: (val: number) => {
-			output.push(String(val));
-		},
-		println: (ptr: number, len: number) => {
-			const mem = new Uint8Array(memory.buffer, ptr, len);
-			output.push(`${decoder.decode(mem)}\n`);
-		},
-		println_64: (val: number) => {
-			output.push(`${val}\n`);
+		println: (boxPtr: number) => {
+			env.print(boxPtr);
+			output.push("\n");
 		},
 	};
 
@@ -222,4 +206,114 @@ export const powFunctionBody = [
 
     0x20, 0x02,     // local.get 2 (result)
     0x0b            // end function
+];
+// biome-ignore format:
+export const boxNumberFunctionBody = [
+	// locals: 1 i32 local (temp_ptr), param is at local[0] (f64)
+	...unsignedLEB(1), // one local
+	0x01, typeCode("i32"), // local[1]: temp_ptr
+
+	// temp_ptr = heap_ptr
+	0x23, 0x00,         // global.get 0 (assumed heap_ptr)
+	0x21, 0x01,         // local.set 1 into local[1] (temp_ptr)
+
+	// store tag = 1 (number) at temp_ptr
+	0x20, 0x01,         // local.get 1
+	0x41, 0x01,         // i32.const 1
+	0x36, 0x02, 0x00,   // i32.store offset=0
+
+	// store f64 at temp_ptr + 4
+	0x20, 0x01,         // local.get 1
+	0x41, 0x04,         // i32.const 4
+	0x6a,               // i32.add
+	0x20, 0x00,         // local.get 0 (f64 param)
+	0x39, 0x03, 0x00,   // f64.store offset=0
+
+	// heap_ptr += 16
+	0x23, 0x00,         // global.get 0
+	0x41, 0x10,         // i32.const 16
+	0x6a,               // i32.add
+	0x24, 0x00,         // global.set 0
+
+	// return temp_ptr
+	0x20, 0x01,         // local.get 1
+	0x0b,               // end
+];
+// biome-ignore format:
+export const unboxNumber = (): number[] => [
+	0x41, 4,         // i32.const 4
+	0x6a,            // i32.add
+	0x2b, 0x03, 0x00 // f64.load align=8, offset=0
+];
+// biome-ignore format:
+export const boxStringFunctionBody = [
+    // two incoming params: string offset (i32) and length (i32)
+    // locals: 1 i32 local (temp_ptr)
+	...unsignedLEB(1), // one local block
+	0x01, typeCode("i32"), // temp_ptr
+
+	// temp_ptr = heap_ptr
+	0x23, 0x00,         // global.get 0
+	0x21, 0x02,         // local.set 2 (temp_ptr)
+
+	// store tag = 2 at [temp_ptr]
+	0x20, 0x02,         // local.get 2
+	0x41, 0x02,         // i32.const 2
+	0x36, 0x02, 0x00,   // i32.store offset=0
+
+	// store offset param at [temp_ptr + 4]
+	0x20, 0x02,         // local.get 2
+	0x41, 0x04,         // i32.const 4
+	0x6a,               // i32.add
+	0x20, 0x00,         // local.get 0 (offset)
+	0x36, 0x02, 0x00,   // i32.store offset=0
+
+	// store length param at [temp_ptr + 12]
+	0x20, 0x02,         // local.get 2
+	0x41, 0x0c,         // i32.const 12
+	0x6a,               // i32.add
+	0x20, 0x01,         // local.get 1 (length)
+	0x36, 0x02, 0x00,   // i32.store offset=0
+
+	// heap_ptr += 16
+	0x23, 0x00,
+	0x41, 0x10,
+	0x6a,
+	0x24, 0x00,
+
+	// return temp_ptr
+	0x20, 0x02,
+	0x0b,
+];
+
+// biome-ignore format:
+export const boxBooleanFunctionBody = [
+	...unsignedLEB(1),         // 1 local (temp_ptr)
+	0x01, typeCode("i32"),
+
+	// temp_ptr = heap_ptr
+	0x23, 0x00,                // global.get 0
+	0x21, 0x01,                // local.set 1
+
+	// store tag = 3 (boolean)
+	0x20, 0x01,                // local.get 1
+	0x41, 0x03,                // i32.const 3
+	0x36, 0x02, 0x00,          // i32.store
+
+	// store boolean value at temp_ptr + 4
+	0x20, 0x01,                // local.get 1
+	0x41, 0x04,                // i32.const 4
+	0x6a,                      // i32.add
+	0x20, 0x00,                // local.get 0 (param)
+	0x36, 0x02, 0x00,          // i32.store
+
+	// heap_ptr += 16
+	0x23, 0x00,
+	0x41, 0x10,
+	0x6a,
+	0x24, 0x00,
+
+	// return temp_ptr
+	0x20, 0x01,
+	0x0b,
 ];

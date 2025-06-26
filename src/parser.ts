@@ -513,6 +513,15 @@ const parseUnary = (state: ParserState): Expression => {
 	if (match(state, "PLUS") || match(state, "MINUS") || match(state, "NOT")) {
 		const op = previousToken(state);
 		const argument = parseUnary(state);
+		if (["BooleanLiteral", "StringLiteral"].includes(argument.type)) {
+			throw new ParseError(
+				"Unary operator cannot be applied to a string or boolean literal",
+				makeProgram([], state.tokens),
+				op.line,
+				op.column,
+				op.value.length,
+			);
+		}
 		return {
 			type: "UnaryExpression",
 			operator: getUnarySymbol(op.type),

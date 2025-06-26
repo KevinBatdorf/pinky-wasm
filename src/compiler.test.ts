@@ -72,7 +72,7 @@ test("print and println with numbers", async () => {
 	expect(output.join("")).toBe("510\n");
 });
 
-test("prints boolean values as 1 and 0", async () => {
+test("prints boolean values as true and false", async () => {
 	const input = `print true
                    println false`;
 	const { tokens } = tokenize(input);
@@ -80,7 +80,7 @@ test("prints boolean values as 1 and 0", async () => {
 	const { bytes, error } = compile(ast);
 	const output = run(bytes);
 	expect(error).toBeNull();
-	expect(output.join("")).toBe("10\n");
+	expect(output.join("")).toBe("truefalse\n");
 });
 
 test("prints binary operators", async () => {
@@ -99,7 +99,7 @@ test("prints binary operators", async () => {
 	const { bytes, error } = compile(ast);
 	const output = run(bytes);
 	expect(error).toBeNull();
-	expect(output.join("")).toBe("88\n84\n11\n11\n10\n");
+	expect(output.join("")).toBe("88\n84\ntruetrue\ntruetrue\ntruefalse\n");
 });
 
 test("prints grouping expressions", async () => {
@@ -157,3 +157,27 @@ test("assigns variables and prints them", async () => {
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("5hello\n15\n10");
 });
+
+// test("short circuits on and & or", async () => {
+// 	const input = `print true and false
+//                    print false or true
+//                    print true or false`;
+// 	const { tokens } = tokenize(input);
+// 	const { ast } = parse(tokens);
+// 	const { bytes, error } = compile(ast);
+// 	const output = run(bytes);
+// 	expect(error).toBeNull();
+// 	expect(output.join("")).toBe("011");
+// });
+
+// test("short circuits on and & or with values", async () => {
+// 	const input = `print true and 7
+//                    print false or "hello"
+//                    print 1 or 2`;
+// 	const { tokens } = tokenize(input);
+// 	const { ast } = parse(tokens);
+// 	const { bytes, error } = compile(ast);
+// 	const output = run(bytes);
+// 	expect(error).toBeNull();
+// 	expect(output.join("")).toBe("7hello1");
+// });
