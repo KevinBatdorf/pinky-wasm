@@ -8,13 +8,51 @@ export const unsignedLEB = (value: number): number[] => {
 	let v = value >>> 0;
 	do {
 		// Take the least significant 7 bits (mask with 0x7f = 01111111)
-		let byte = v & valType("i32");
+		let byte = v & 0x7f;
 		// Shift value right by 7 bits to get the rest for the next round
 		v >>>= 7;
 		// If there's anything left, set high bit (0x80 = 10000000) to say: "more bytes follow"
 		if (v !== 0) byte |= 0x80;
 		bytes.push(byte);
 	} while (v !== 0);
+	return bytes;
+};
+
+// Encode a signed number as LEB128 (Little Endian Base 128)
+// This is used for signed integer literals in WebAssembly (e.g., i32.const, i64.const)
+// LEB128 stores integers in a variable-length format, 7 bits per byte
+// The 8th bit (0x80) marks whether another byte follows
+// For signed numbers, sign-extension must be preserved during decoding
+export const signedLEB = (value: number): number[] => {
+	const bytes: number[] = [];
+	let v = value;
+	do {
+		// Grab the least significant 7 bits of the current value
+		let byte = v & 0x7f;
+		// Arithmetic right shift to preserve the sign bit during shift
+		// This makes `-1 >> 7 === -1`, unlike logical shift which would yield a positive
+		const shifted = v >> 7;
+		// Extract the sign bit of the current 7-bit chunk (bit 6)
+		const signBit = byte & 0x40;
+		// Decide whether we need to keep encoding more bytes
+		// The goal is to stop if shifting has reached:
+		//   - 0 and the sign bit is clear
+		//   - -1 and the sign bit is set
+		const more = !(
+			(shifted === 0 && signBit === 0) ||
+			(shifted === -1 && signBit !== 0)
+		);
+		// If we still need more bytes, set the high bit (0x80)
+		if (more) byte |= 0x80;
+		bytes.push(byte);
+		v = shifted; // Prepare for the next 7 bits
+	} while (
+		// Repeat until all significant bits are encoded *and* the sign bit is correctly preserved
+		!(
+			(v === 0 && (bytes[bytes.length - 1] & 0x40) === 0) ||
+			(v === -1 && (bytes[bytes.length - 1] & 0x40) !== 0)
+		)
+	);
 	return bytes;
 };
 
@@ -132,11 +170,16 @@ export const global = {
 	set: (index: number): number[] => [0x24, ...unsignedLEB(index)],
 };
 export const i32 = {
-	const: (value: number): number[] => [0x41, ...unsignedLEB(value)],
+	const: (value: number): number[] => [0x41, ...signedLEB(value)],
 	eq: (): number[] => [0x46],
+	eqz: (): number[] => [0x45], // equal zero
+	gt_u: (): number[] => [0x4c], // unsigned greater than
 	ge_s: (): number[] => [0x4e], // signed greater than or equal
 	ne: (): number[] => [0x47],
+	lt_s: (): number[] => [0x48], // signed less than
 	add: (): number[] => [0x6a],
+	sub: (): number[] => [0x6b],
+	mul: (): number[] => [0x6c],
 	trunc_f64_s: (): number[] => [0xaa], // convert f64 to i32 (signed)
 	load: (offset = 0): number[] => [0x28, 0x02, ...unsignedLEB(offset)],
 	store: (offset = 0): number[] => [0x36, 0x02, ...unsignedLEB(offset)],
@@ -153,6 +196,7 @@ export const f64 = {
 	add: (): number[] => [0xa0],
 	sub: (): number[] => [0xa1],
 	mul: (): number[] => [0xa2],
+	convert_i32_s: (): number[] => [0xb7],
 	div: (): number[] => [0xa3],
 	neg: (): number[] => [0x9a],
 	trunc: (): number[] => [0x9d],
@@ -171,6 +215,13 @@ export const control = {
 };
 export const fn = {
 	call: (index: number): number[] => [0x10, ...unsignedLEB(index)],
+};
+export const memory = {
+	size: (index = 0) => [0x3f, index],
+	grow: (index = 0) => [0x40, index],
+};
+export const misc = {
+	drop: (): number[] => [0x1a],
 };
 
 export const nativeBinOps = {
@@ -242,7 +293,7 @@ export const powFunctionBody = [
 			...local.get(4), // counter
 			...local.get(3), // the exp_i32
 			...i32.ge_s(),
-			...control.br_if(1), // break outer block
+			...control.br_if(1), // break outer control.block()
 
 			...local.get(2), // result
 			...local.get(0), // base
@@ -254,7 +305,7 @@ export const powFunctionBody = [
 			...i32.add(), // counter++
 			...local.set(4),
 
-			...control.br(0), // repeat loop
+			...control.br(0), // repeat control.loop()
 		...control.end(), // loop
 	...control.end(), // block
 

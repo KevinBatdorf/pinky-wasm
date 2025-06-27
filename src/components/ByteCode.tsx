@@ -13,7 +13,7 @@ export const ByteCode = ({
 	return (
 		<div className="flex-grow pb-60">
 			{strings?.length ? (
-				<div className="bg-gray-900 p-1 text-xs rounded mb-1 text-gray-400 whitespace-normal">
+				<div className="bg-gray-900 p-1 text-xs rounded mb-1 text-gray-400 whitespace-normal break-all">
 					{new TextDecoder().decode(strings)}
 				</div>
 			) : null}

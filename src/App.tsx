@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Token } from "./tokens";
 import { CodeEditor } from "./components/Editor";
-import { example } from "./example";
+import example from "./example.pinky";
 import { TokensComponent } from "./components/Tokens";
 import { tokenize, type TokenErrorType } from "./lexer";
 import { parse } from "./parser";
@@ -263,7 +263,7 @@ function App() {
 							{outputError ? (
 								<div className="text-wrap text-red-500">{outputError}</div>
 							) : (
-								<div className="pb-60 whitespace-pre-wrap text-gray-100">
+								<div className="pb-60 whitespace-pre-wrap text-gray-100 break-all">
 									{output
 										?.join("")
 										.split("\n")

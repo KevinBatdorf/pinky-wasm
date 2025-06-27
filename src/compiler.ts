@@ -1,5 +1,5 @@
 import type { AST } from "./parser";
-import type { Expression } from "./syntax";
+import type { Expression, Statement } from "./syntax";
 import {
 	local,
 	nativeBinOps,
@@ -45,6 +45,7 @@ const getTypeKey = (type: {
 	params: readonly string[];
 	results: readonly string[];
 }) => `(${type.params.join(",")})=>(${type.results.join(",")})`;
+
 // Set types for all functions
 for (const imp of allFunctions) {
 	const key = getTypeKey(imp.type);
@@ -69,21 +70,34 @@ definedFunctions.forEach((def, i) => {
 type VarInfo = { name: string; index: number };
 type Scope = Map<string, VarInfo>;
 let scopes: Scope[] = [new Map()]; // global scope
-// const enterScope = () => scopes.push(new Map());
-// const exitScope = () => scopes.pop();
+const enterScope = () => scopes.push(new Map());
+const exitScope = () => scopes.pop();
 
-const findScopeForVar = (name: string): Scope | null =>
-	scopes
-		.slice()
-		.reverse()
-		.find((scope) => scope.has(name)) ?? scopes[0]; // global scope fallback
+const findScopeForVar = (name: string): Scope => {
+	// walk up scopes from the last looking for the variable
+	for (let i = 1; i < scopes.length + 1; i++) {
+		const scope = scopes.at(-i);
+		if (scope?.has(name)) return scope;
+	}
+	const lastScope = scopes.at(-1);
+	if (!lastScope) {
+		throw new Error(`No scopes available to find variable "${name}"`);
+	}
+	return lastScope; // fallsback to the last scope
+};
 let nextLocalIndex = 0; // for local variables
 const declareVar = (name: string, isLocal: boolean): VarInfo | null => {
-	const scope = isLocal ? scopes[scopes.length - 1] : findScopeForVar(name);
+	if (isLocal && scopes.at(-1)?.has(name)) {
+		// Cant do local x := 1 twice in the same scope
+		throw new Error(`Variable "${name}" already declared in current scope`);
+	}
+	const scope = isLocal ? scopes.at(-1) : findScopeForVar(name);
 	if (!scope) throw new Error(`No scope found for variable "${name}"`);
-	if (scope.has(name))
-		throw new Error(`Variable "${name}" already declared in this scope`);
-	const varInfo: VarInfo = { name, index: nextLocalIndex++ };
+	const index = scope.has(name) ? scope?.get(name)?.index : nextLocalIndex++;
+	if (typeof index === "undefined") {
+		throw new Error(`Failed to get index for variable "${name}"`);
+	}
+	const varInfo: VarInfo = { name, index };
 	scope.set(name, varInfo);
 	return varInfo;
 };
@@ -237,7 +251,6 @@ const _compile = (
 
 	// Code section
 	const mainFunc = mainFuncBody(ast, strings);
-	console.log("Main function body:", mainFunc);
 	const codeSection = emitSection(
 		10,
 		new Uint8Array([
@@ -275,14 +288,13 @@ const _compile = (
 	);
 
 	// This is listed out of order becasue we need to calc the heap size
-	// global heap pointer, mutable i32, init to 1024
 	const globalSection = emitSection(
 		6,
 		new Uint8Array([
 			0x01, // one global
 			valType("i32"),
 			0x01, // mutable
-			...i32.const(stringBytes.length + 1),
+			...i32.const(stringBytes.length + 1), // TODO: do I need to grow this?
 			...control.end(), // end of global init
 		]),
 	);
@@ -304,42 +316,7 @@ export const mainFuncBody = (
 	ast: AST,
 	strings: ReturnType<typeof createStringTable>,
 ): number[] => {
-	const instructions: number[] = [];
-
-	for (const stmt of ast.body) {
-		switch (stmt.type) {
-			case "PrintlnStatement": {
-				const bytes = compileExpression(stmt.expression, strings);
-				instructions.push(...bytes);
-				instructions.push(...fn.call(f.println));
-				break;
-			}
-			case "PrintStatement": {
-				const bytes = compileExpression(stmt.expression, strings);
-				instructions.push(...bytes);
-				instructions.push(...fn.call(f.print));
-				break;
-			}
-			case "LocalAssignStatement":
-			case "AssignStatement": {
-				const { identifier, expression } = stmt;
-				const isLocal = stmt.type === "LocalAssignStatement";
-				const varInfo = declareVar(identifier.name, isLocal);
-				if (!varInfo) {
-					throw new Error(`Failed to declare variable "${identifier.name}"`);
-				}
-				const bytes = compileExpression(expression, strings);
-				instructions.push(...bytes, ...local.set(varInfo.index)); // set the variable
-				break;
-			}
-			case "IfStatement": {
-				// const condition = compileExpression(stmt.condition, strings);
-				break;
-			}
-			default:
-				throw new Error(`Unsupported statement type: ${stmt.type}`);
-		}
-	}
+	const instructions: number[] = compileStatements(ast.body, strings);
 
 	// Since we are boxing, there's only one type of local variable (i32)
 	const localDecals: number[] =
@@ -351,6 +328,114 @@ export const mainFuncBody = (
 				]
 			: unsignedLEB(0); // no locals
 	return [...localDecals, ...instructions, ...control.end()];
+};
+
+const compileStatements = (
+	statements: Statement[],
+	strings: ReturnType<typeof createStringTable>,
+): number[] => {
+	const instructions: number[] = [];
+	for (const stmt of statements) {
+		const bytes = compileStatement(stmt, strings);
+		instructions.push(...bytes);
+	}
+	return instructions;
+};
+
+const compileStatement = (
+	stmt: Statement,
+	strings: ReturnType<typeof createStringTable>,
+): number[] => {
+	const instructions: number[] = [];
+	switch (stmt.type) {
+		case "PrintlnStatement": {
+			const bytes = compileExpression(stmt.expression, strings);
+			instructions.push(...bytes);
+			instructions.push(...fn.call(f.println));
+			break;
+		}
+		case "PrintStatement": {
+			const bytes = compileExpression(stmt.expression, strings);
+			instructions.push(...bytes);
+			instructions.push(...fn.call(f.print));
+			break;
+		}
+		case "LocalAssignStatement":
+		case "AssignStatement": {
+			const { identifier, expression } = stmt;
+			const isLocal = stmt.type === "LocalAssignStatement";
+			const varInfo = declareVar(identifier.name, isLocal);
+			if (!varInfo) {
+				throw new Error(`Failed to declare variable "${identifier.name}"`);
+			}
+			const bytes = compileExpression(expression, strings);
+			instructions.push(...bytes, ...local.set(varInfo.index)); // set the variable
+			break;
+		}
+		case "IfStatement": {
+			const condition = compileExpression(stmt.condition, strings);
+			enterScope();
+			const thenBranch = compileStatements(stmt.thenBranch, strings);
+			exitScope();
+			const bytes = [
+				...condition,
+				...fn.call(f.is_truthy),
+				...control.if(),
+				...thenBranch,
+			];
+			let elseBlock: number[] = [];
+			if (stmt.elseBranch) {
+				enterScope();
+				elseBlock = compileStatements(stmt.elseBranch, strings);
+				exitScope();
+			}
+			// add elif branches in reverse, nesting them inside each other
+			if (stmt.elifBranches?.length) {
+				for (let i = stmt.elifBranches.length - 1; i >= 0; i--) {
+					const elif = stmt.elifBranches[i];
+					const condition = compileExpression(elif.condition, strings);
+					enterScope();
+					const elifBranch = compileStatements(elif.body, strings);
+					exitScope();
+					elseBlock = [
+						...condition,
+						...fn.call(f.is_truthy),
+						...control.if(),
+						...elifBranch,
+						...control.else(),
+						...elseBlock, // else block needs to be repositioned
+						...control.end(),
+					];
+				}
+			}
+			// Add the final elseBlock to the original if
+			bytes.push(...control.else(), ...elseBlock, ...control.end());
+			instructions.push(...bytes);
+			break;
+		}
+		case "WhileStatement": {
+			const condition = compileExpression(stmt.condition, strings);
+			enterScope();
+			const body = compileStatements(stmt.body, strings);
+			exitScope();
+			// biome-ignore format:
+			return [
+				...control.block(),
+                ...control.loop(),
+                    ...condition,
+                    ...fn.call(f.is_truthy),
+                    ...i32.eqz(), // check if condition is false
+                    ...control.br_if(1), // break out of outer block
+                    ...body,
+                    ...control.br(0), // loop back
+                ...control.end(),
+                ...control.end(),
+			];
+		}
+		default:
+			throw new Error(`Unsupported statement type: ${stmt.type}`);
+	}
+	return instructions;
 };
 
 const comparisonOps = new Set(["==", "~=", ">", ">=", "<", "<="]);
@@ -409,7 +494,7 @@ const compileExpression = (
 						...unboxNumber(),
 						...right,
 						...unboxNumber(),
-						...fn.call(f.mod), // call mod → f64
+						...fn.call(f.mod), // call mod -> f64
 						...fn.call(f.box_number), // box the result
 					];
 				case "^":
@@ -463,7 +548,7 @@ const compileExpression = (
 				case "-": {
 					if (expr.argument.type === "NumberLiteral") {
 						return [
-							...f64.const(-expr.argument.value), // note the -
+							...f64.const(-expr.argument.value), // note the "-"
 							...fn.call(f.box_number),
 						];
 					}

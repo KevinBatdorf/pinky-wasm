@@ -95,6 +95,7 @@ export const CodeEditor = (props: CodeEditorProps) => {
 				className="font-mono"
 				onValueChange={onChange}
 				onClick={() => onChange(value)}
+				onKeyDown={() => onChange(value)}
 				{...remainingProps}
 				padding={16}
 				style={{
