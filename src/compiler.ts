@@ -1,12 +1,12 @@
 import type { AST } from "./parser";
 import type { Expression } from "./syntax";
 import {
+	local,
+	nativeBinOps,
+	valType,
 	emitSection,
 	unsignedLEB,
 	encodeString,
-	encodeF64,
-	typeCode,
-	nativeBinOps,
 	modFunctionBody,
 	powFunctionBody,
 	boxNumberFunctionBody,
@@ -14,6 +14,10 @@ import {
 	boxStringFunctionBody,
 	isTruthyFunctionBody,
 	unboxNumber,
+	i32,
+	f64,
+	control,
+	fn,
 } from "./wasm";
 
 export type CompilerErrorType = Error | null;
@@ -36,7 +40,7 @@ const allFunctions = [...definedFunctions, ...importFunctions];
 // We can only add a type once, so we use a map to track them
 const typeMap = new Map<string, number>();
 const typeEntries: number[][] = [];
-const functionIndices: Record<string, number> = {};
+const f: Record<string, number> = {};
 const getTypeKey = (type: {
 	params: readonly string[];
 	results: readonly string[];
@@ -49,16 +53,16 @@ for (const imp of allFunctions) {
 	typeEntries.push([
 		0x60, // function type
 		...unsignedLEB(imp.type.params.length), // number of params
-		...imp.type.params.map((p) => typeCode(p)), // params
+		...imp.type.params.map((p) => valType(p)), // params
 		...unsignedLEB(imp.type.results.length), // number of results
-		...imp.type.results.map((r) => typeCode(r)), // results
+		...imp.type.results.map((r) => valType(r)), // results
 	]);
 }
 importFunctions.forEach((imp, i) => {
-	functionIndices[imp.name] = i;
+	f[imp.name] = i;
 });
 definedFunctions.forEach((def, i) => {
-	functionIndices[def.name] = importFunctions.length + i;
+	f[def.name] = importFunctions.length + i;
 });
 
 // Manage variables
@@ -90,20 +94,16 @@ const getVar = (name: string): VarInfo => {
 	return varInfo;
 };
 // For temporary variables, we use a special index
-const getScratchIndex = (() => {
-	let index: number | null = null;
-	return () => {
-		if (index === null) index = nextLocalIndex++;
-		return index;
-	};
-})();
-
+let scratchIndex: number | null = null;
+const getScratchIndex = (): number => {
+	if (scratchIndex === null) scratchIndex = nextLocalIndex++;
+	return scratchIndex;
+};
 // Create a string table to manage string offsets in the WASM binary
 const createStringTable = () => {
 	let memoryOffset = 0;
 	const encoder = new TextEncoder();
 	const table = new Map<string, number>();
-
 	return {
 		getBytes: () => {
 			const all = Array.from(table.entries()).flatMap(([str]) => [
@@ -152,6 +152,9 @@ const _compile = (
 ): Uint8Array => {
 	// Reset scopes for each compile
 	scopes = [new Map()]; // reset to global scope
+	nextLocalIndex = 0; // reset local index
+	scratchIndex = null; // reset scratch index
+
 	// WASM magic + version
 	const header = new Uint8Array([
 		0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
@@ -181,8 +184,8 @@ const _compile = (
 				return [
 					...encodeString("env"),
 					...encodeString(imp.name),
-					0x00, // kind 0x00 (function import)
-					...unsignedLEB(typeIndex), // type index
+					0x00, // function import
+					...unsignedLEB(typeIndex),
 				];
 			}),
 		]),
@@ -208,32 +211,28 @@ const _compile = (
 	// Memory section (1 memory with min 1 page)
 	const memorySection = emitSection(
 		5, // memory section id
-		// biome-ignore format:
 		new Uint8Array([
-            0x01, // number of memories
-            0x00, // limits: min only
-            0x01, // min = 1 page = 64KB
-        ]),
+			0x01, // number of memories
+			0x00, // limits: min only
+			0x01, // min = 1 page = 64KB
+		]),
 	);
 
 	// Export section (export "main" and "memory")
 	const exportSection = emitSection(
 		7,
-		// biome-ignore format:
 		new Uint8Array([
-            0x02, // 2 exports
-
-            // export "main" = function 1
-            ...encodeString("main"),
-            0x00, // export kind: func
-            // main is exported after imports (print/println)
-            ...unsignedLEB(functionIndices.main),
-
-            // export "memory" = memory 0
-            ...encodeString("memory"),
-            0x02, // export kind: memory
-            0x00, // memory index 0
-        ]),
+			...unsignedLEB(2), // 2 exports
+			// export "main" = function 1
+			...encodeString("main"),
+			0x00, // export kind: func
+			// main is exported after imports (print/println)
+			...unsignedLEB(f.main),
+			// export "memory" = memory 0
+			...encodeString("memory"),
+			0x02, // export kind: memory
+			0x00, // memory index 0
+		]),
 	);
 
 	// Code section
@@ -265,29 +264,27 @@ const _compile = (
 	const stringBytes = strings.getBytes();
 	const dataSection = emitSection(
 		11,
-		// biome-ignore format:
 		new Uint8Array([
-            0x01, // 1 data segment
-            0x00, // memory index 0
-            0x41, ...unsignedLEB(0), // i32.const 0 (start offset)
-            0x0b, // end
-            ...unsignedLEB(stringBytes.length),
-            ...stringBytes,
-        ]),
+			0x01, // 1 data segment
+			0x00, // memory index 0
+			...i32.const(0), // start offset
+			...control.end(),
+			...unsignedLEB(stringBytes.length),
+			...stringBytes,
+		]),
 	);
 
 	// This is listed out of order becasue we need to calc the heap size
 	// global heap pointer, mutable i32, init to 1024
 	const globalSection = emitSection(
 		6,
-		// biome-ignore format:
 		new Uint8Array([
-            0x01, // one global
-            typeCode("i32"),
-            0x01,  // mutable
-            0x41, ...unsignedLEB(stringBytes.length + 1),
-            0x0b, // end
-        ]),
+			0x01, // one global
+			valType("i32"),
+			0x01, // mutable
+			...i32.const(stringBytes.length + 1),
+			...control.end(), // end of global init
+		]),
 	);
 
 	return new Uint8Array([
@@ -314,13 +311,13 @@ export const mainFuncBody = (
 			case "PrintlnStatement": {
 				const bytes = compileExpression(stmt.expression, strings);
 				instructions.push(...bytes);
-				instructions.push(0x10, functionIndices.println);
+				instructions.push(...fn.call(f.println));
 				break;
 			}
 			case "PrintStatement": {
 				const bytes = compileExpression(stmt.expression, strings);
 				instructions.push(...bytes);
-				instructions.push(0x10, functionIndices.print);
+				instructions.push(...fn.call(f.print));
 				break;
 			}
 			case "LocalAssignStatement":
@@ -332,7 +329,11 @@ export const mainFuncBody = (
 					throw new Error(`Failed to declare variable "${identifier.name}"`);
 				}
 				const bytes = compileExpression(expression, strings);
-				instructions.push(...bytes, 0x21, ...unsignedLEB(varInfo.index)); // i32.store
+				instructions.push(...bytes, ...local.set(varInfo.index)); // set the variable
+				break;
+			}
+			case "IfStatement": {
+				// const condition = compileExpression(stmt.condition, strings);
 				break;
 			}
 			default:
@@ -346,10 +347,10 @@ export const mainFuncBody = (
 			? [
 					...unsignedLEB(1), // 1 type group
 					...unsignedLEB(nextLocalIndex), // N locals
-					0x7f, // i32
+					valType("i32"), // all locals are boxed i32
 				]
-			: [0x00]; // no locals
-	return [...localDecals, ...instructions, 0x0b];
+			: unsignedLEB(0); // no locals
+	return [...localDecals, ...instructions, ...control.end()];
 };
 
 const comparisonOps = new Set(["==", "~=", ">", ">=", "<", "<="]);
@@ -362,30 +363,21 @@ const compileExpression = (
 		case "StringLiteral": {
 			const offset = strings.getOffset(String(expr.value));
 			const length = textEncoder.encode(String(expr.value)).length;
-			// biome-ignore format:
 			return [
-                0x41, ...unsignedLEB(offset), // i32.const offset
-                0x41, ...unsignedLEB(length), // i32.const length
-                0x10, functionIndices.box_string, // call box_string → i32 ptr
-            ]
+				...i32.const(offset),
+				...i32.const(length),
+				...fn.call(f.box_string),
+			];
 		}
 		case "NumberLiteral": {
-			// biome-ignore format:
-			return [
-                0x44, ...encodeF64(expr.value), // f64.const value
-                0x10, functionIndices.box_number, // call box_number → i32 ptr
-            ]
+			return [...f64.const(expr.value), ...fn.call(f.box_number)];
 		}
 		case "BooleanLiteral":
-			// biome-ignore format:
-			return [
-                0x41, expr.value ? 1 : 0, // i32.const value (0 or 1)
-                0x10, functionIndices.box_bool, // call box_bool → i32 ptr
-            ]
+			return [...i32.const(expr.value ? 1 : 0), ...fn.call(f.box_bool)];
 		case "Identifier": {
 			const { index } = getVar(expr.name);
-			// All vars are boxed i32, so just local.get the pointer
-			return [0x20, ...unsignedLEB(index)]; // local.get index
+			// All vars are boxed i32, so just get the pointer
+			return local.get(index);
 		}
 		case "GroupingExpression":
 			return compileExpression(expr.expression, strings);
@@ -395,66 +387,69 @@ const compileExpression = (
 			const nativeOp = nativeBinOps[expr.operator];
 			// Native operators supported for f64
 			if (nativeOp !== null) {
-				// biome-ignore format:
 				const ops: number[] = [
-                    ...left, ...unboxNumber(),
-                    ...right, ...unboxNumber(),
-                    nativeOp,
-                ];
+					...left,
+					...unboxNumber(),
+					...right,
+					...unboxNumber(),
+					nativeOp,
+				];
 				// comparing f64, f64 results in i32 so convert it back to f64
 				if (comparisonOps.has(expr.operator)) {
-					ops.push(0x10, functionIndices.box_bool); // call box_bool → i32 ptr
+					ops.push(...fn.call(f.box_bool));
 					return ops;
 				}
-				ops.push(0x10, functionIndices.box_number); // call box_number → i32 ptr
+				ops.push(...fn.call(f.box_number));
 				return ops;
 			}
 			switch (expr.operator) {
 				case "%":
-					// biome-ignore format:
 					return [
-                        ...left, ...unboxNumber(),
-                        ...right, ...unboxNumber(),
-                        0x10, functionIndices.mod, // call mod → f64
-                        0x10, functionIndices.box_number, // call box_number → i32 ptr
-                    ]
+						...left,
+						...unboxNumber(),
+						...right,
+						...unboxNumber(),
+						...fn.call(f.mod), // call mod → f64
+						...fn.call(f.box_number), // box the result
+					];
 				case "^":
 					// TODO write runtime error if exp is not an integer
-					// biome-ignore format:
 					return [
-                        ...left, ...unboxNumber(),
-                        ...right, ...unboxNumber(),
-                        0x10, functionIndices.pow,
-                        0x10, functionIndices.box_number,
-                    ];
+						...left,
+						...unboxNumber(),
+						...right,
+						...unboxNumber(),
+						...fn.call(f.pow),
+						...fn.call(f.box_number),
+					];
 				case "and": {
 					const scratch = getScratchIndex();
 					// biome-ignore format:
 					return [
-                        ...left,                           // evaluate A
-                        0x21, ...unsignedLEB(scratch),     // local.set scratch
-                        0x20, ...unsignedLEB(scratch),     // local.get scratch
-                        0x10, functionIndices.is_truthy,   // call is_truthy
-                        0x04, 0x7f,                        // if (result i32)
-                            ...right,                      // else: evaluate and return B
-                        0x05,                              // else
-                            0x20, ...unsignedLEB(scratch), // then: return A (scratch)
-                        0x0b,                              // end
+                        ...left, // evaluate A
+                        ...local.set(scratch),
+                        ...local.get(scratch),
+                        ...fn.call(f.is_truthy),
+                        ...control.if(valType("i32")),
+                            ...right, // evaluate and return B
+                        ...control.else(),
+                            ...local.get(scratch), // return A
+                        ...control.end(),
                     ];
 				}
 				case "or": {
 					const scratch = getScratchIndex();
 					// biome-ignore format:
 					return [
-                        ...left,                           // evaluate A
-                        0x21, ...unsignedLEB(scratch),     // local.set scratch
-                        0x20, ...unsignedLEB(scratch),     // local.get scratch
-                        0x10, functionIndices.is_truthy,   // call is_truthy
-                        0x04, 0x7f,                        // if (result i32)
-                            0x20, ...unsignedLEB(scratch), // then: return A (scratch)
-                        0x05,                              // else
-                            ...right,                      // else: evaluate and return B
-                        0x0b,                              // end
+                        ...left, // evaluate A
+                        ...local.set(scratch),
+                        ...local.get(scratch),
+                        ...fn.call(f.is_truthy),
+                        ...control.if(valType("i32")),
+                            ...local.get(scratch), //return A
+                        ...control.else(),
+                            ...right, // evaluate and return B
+                        ...control.end(),
                     ];
 				}
 				default:
@@ -467,29 +462,25 @@ const compileExpression = (
 					return compileExpression(expr.argument, strings);
 				case "-": {
 					if (expr.argument.type === "NumberLiteral") {
-						// If it's a number literal, negate the value
-						// biome-ignore format:
 						return [
-                            0x44, ...encodeF64(-expr.argument.value), // f64.const -value
-                            0x10, functionIndices.box_number, // call box_number → i32 ptr
-                        ];
+							...f64.const(-expr.argument.value), // note the -
+							...fn.call(f.box_number),
+						];
 					}
-					// biome-ignore format:
 					return [
 						...compileExpression(expr.argument, strings),
-                        ...unboxNumber(),
-						0x9a, // f64.neg (negate the f64 value)
-						0x10, functionIndices.box_number, // call box_number → i32 ptr
+						...unboxNumber(),
+						...f64.neg(), // negate the value
+						...fn.call(f.box_number),
 					];
 				}
 				case "~":
-					// biome-ignore format:
 					return [
 						...compileExpression(expr.argument, strings),
-                        ...unboxNumber(),
-						0x44, ...encodeF64(0), // f64.const 0
-						0x61, // f64.eq (result is i32)
-						0x10, functionIndices.box_bool, // call box_bool → i32 ptr
+						...unboxNumber(),
+						...f64.const(0),
+						...f64.eq(), // result is i32 here
+						...fn.call(f.box_bool),
 					];
 				default:
 					throw new Error(`Unsupported unary operator: ${expr.operator}`);

@@ -8,7 +8,7 @@ export const unsignedLEB = (value: number): number[] => {
 	let v = value >>> 0;
 	do {
 		// Take the least significant 7 bits (mask with 0x7f = 01111111)
-		let byte = v & typeCode("i32");
+		let byte = v & valType("i32");
 		// Shift value right by 7 bits to get the rest for the next round
 		v >>>= 7;
 		// If there's anything left, set high bit (0x80 = 10000000) to say: "more bytes follow"
@@ -36,34 +36,6 @@ export const emitSection = (
 	const size = unsignedLEB(payload.length);
 	return new Uint8Array([sectionId, ...size, ...payload]);
 };
-
-export const typeCode = (t: "i32" | "f64"): number => {
-	switch (t) {
-		case "i32":
-			return 0x7f;
-		case "f64":
-			return 0x7c;
-		default:
-			throw new Error(`Unknown type: ${t}`);
-	}
-};
-export const nativeBinOps = {
-	"+": 0xa0, // f64.add
-	"-": 0xa1, // f64.sub
-	"*": 0xa2, // f64.mul
-	"/": 0xa3, // f64.div
-	"==": 0x61, // f64.eq
-	"~=": 0x62, // f64.ne
-	"<": 0x63, // f64.lt
-	">": 0x64, // f64.gt
-	"<=": 0x65, // f64.le
-	">=": 0x66, // f64.ge
-	// unsupported native operators
-	"%": null,
-	"^": null,
-	and: null,
-	or: null,
-} as const;
 
 export type RunFunction = (bytes: Uint8Array) => string[];
 export const loadWasm = async (): Promise<{ run: RunFunction }> => {
@@ -123,235 +95,314 @@ export const loadWasm = async (): Promise<{ run: RunFunction }> => {
 	return { run };
 };
 
+// opcode helpers
+export const valType = (t: "i32" | "f64" | "void"): number => {
+	switch (t) {
+		case "i32":
+			return 0x7f;
+		case "f64":
+			return 0x7c;
+		case "void":
+			return 0x40; // void type
+		default:
+			throw new Error(`Unknown type: ${t}`);
+	}
+};
+
+export const local = {
+	declare: (...types: ("i32" | "f64")[]): number[] => {
+		if (!types.length) return [0x00]; // no locals
+		const groups = new Map<string, number>();
+		for (const t of types) {
+			groups.set(t, (groups.get(t) ?? 0) + 1);
+		}
+		const result: number[] = [...unsignedLEB(groups.size)];
+		for (const [type, count] of groups.entries()) {
+			result.push(...unsignedLEB(count));
+			result.push(valType(type as "i32" | "f64"));
+		}
+		return result;
+	},
+	get: (index: number): number[] => [0x20, ...unsignedLEB(index)],
+	set: (index: number): number[] => [0x21, ...unsignedLEB(index)],
+	tee: (index: number): number[] => [0x22, ...unsignedLEB(index)],
+};
+export const global = {
+	get: (index: number): number[] => [0x23, ...unsignedLEB(index)],
+	set: (index: number): number[] => [0x24, ...unsignedLEB(index)],
+};
+export const i32 = {
+	const: (value: number): number[] => [0x41, ...unsignedLEB(value)],
+	eq: (): number[] => [0x46],
+	ge_s: (): number[] => [0x4e], // signed greater than or equal
+	ne: (): number[] => [0x47],
+	add: (): number[] => [0x6a],
+	trunc_f64_s: (): number[] => [0xaa], // convert f64 to i32 (signed)
+	load: (offset = 0): number[] => [0x28, 0x02, ...unsignedLEB(offset)],
+	store: (offset = 0): number[] => [0x36, 0x02, ...unsignedLEB(offset)],
+};
+
+export const f64 = {
+	const: (value: number): number[] => [0x44, ...encodeF64(value)],
+	eq: (): number[] => [0x61],
+	ne: (): number[] => [0x62],
+	lt: (): number[] => [0x63],
+	gt: (): number[] => [0x64],
+	le: (): number[] => [0x65],
+	ge: (): number[] => [0x66],
+	add: (): number[] => [0xa0],
+	sub: (): number[] => [0xa1],
+	mul: (): number[] => [0xa2],
+	div: (): number[] => [0xa3],
+	neg: (): number[] => [0x9a],
+	trunc: (): number[] => [0x9d],
+	load: (offset = 0): number[] => [0x2b, 0x03, ...unsignedLEB(offset)],
+	store: (offset = 0): number[] => [0x39, 0x03, ...unsignedLEB(offset)],
+};
+export const control = {
+	block: (type = valType("void")): number[] => [0x02, ...unsignedLEB(type)],
+	loop: (type = valType("void")): number[] => [0x03, ...unsignedLEB(type)],
+	if: (type = valType("void")): number[] => [0x04, ...unsignedLEB(type)],
+	else: (): number[] => [0x05],
+	end: (): number[] => [0x0b],
+	br: (labelIndex: number): number[] => [0x0c, ...unsignedLEB(labelIndex)],
+	br_if: (labelIndex: number): number[] => [0x0d, ...unsignedLEB(labelIndex)],
+	return: (): number[] => [0x0f],
+};
+export const fn = {
+	call: (index: number): number[] => [0x10, ...unsignedLEB(index)],
+};
+
+export const nativeBinOps = {
+	"+": f64.add()[0],
+	"-": f64.sub()[0],
+	"*": f64.mul()[0],
+	"/": f64.div()[0],
+	"==": f64.eq()[0],
+	"~=": f64.ne()[0],
+	"<": f64.lt()[0],
+	">": f64.gt()[0],
+	"<=": f64.le()[0],
+	">=": f64.ge()[0],
+	// unsupported native operators - but pinky needs
+	"%": null,
+	"^": null,
+	and: null,
+	or: null,
+} as const;
+
 // biome-ignore format:
 // js/lua style modulus
 export const modFunctionBody = [
-	...unsignedLEB(0), // 0 local variables
-	0x20, 0x00, // local.get 0 (left)
-	0x20, 0x01, // local.get 1 (right)
-	0x20, 0x00, // local.get 0 (left)
-	0x20, 0x01, // local.get 1 (right)
-	0xa3, // f64.div
-	0x9d, // f64.trunc
-	0xa2, // f64.mul
-	0xa1, // f64.sub => yields a - b * floor(a/b)
-	0x0b, // end
+	...local.declare(), // no locals
+	...local.get(0),    // 0 (left)
+	...local.get(1),    // 1 (right)
+	...local.get(0),    // 0 (left)
+	...local.get(1),    // 1 (right)
+	...f64.div(),
+	...f64.trunc(), // trunc to integer
+	...f64.mul(),   // multiply by right
+	...f64.sub(),   // subtract -> yields a - b * floor(a/b)
+	...control.end(),
 ];
 
 // biome-ignore format:
 export const powFunctionBody = [
-	...unsignedLEB(3),           // 3 locals
-	0x01, typeCode("f64"),       // local[2]: result
-	0x01, typeCode("i32"),       // local[3]: exp_i32
-	0x01, typeCode("i32"),       // local[4]: counter
-
+    // incoming params: base (f64), exp (f64)
+    ...local.declare("f64", "i32", "i32"), // result, exp_i32, counter
 	// If exp < 0, invert base and negate exp
-	0x20, 0x01,                // local.get 1 (exp)
-	0x44, ...encodeF64(0),     // f64.const 0
-	0x63,                      // f64.lt
-	0x04, 0x40,                // if
-		0x44, ...encodeF64(1), // f64.const 1
-		0x20, 0x00,            // local.get 0 (base)
-		0xa3,                  // f64.div
-		0x21, 0x00,            // local.set 0 (base = 1 / base)
-
-		0x20, 0x01,            // local.get 1 (exp)
-		0x9a,                  // f64.neg
-		0x21, 0x01,            // local.set 1 (exp = -exp)
-	0x0b,                      // end if
+	...local.get(1), // the exp
+	...f64.const(0),
+	...f64.lt(),
+	...control.if(), // if (exp < 0)
+		...f64.const(1),
+		...local.get(0), // the base
+		...f64.div(),
+		...local.set(0), // base = 1 / base
+		...local.get(1), // the exp
+		...f64.neg(),
+		...local.set(1), // exp = -exp
+	...control.end(),
 
 	// result = base
-	0x20, 0x00,  // local.get 0 (base)
-	0x21, 0x02,  // local.set 2
+	...local.get(0), // the base
+	...local.set(2), // local.set 2
 
 	// exp_i32 = trunc(exp)
-	0x20, 0x01,  // local.get 1 (exp)
-	0xaa,        // i32.trunc_f64_s
-	0x21, 0x03,  // local.set 3
+	...local.get(1), // the exp
+	...i32.trunc_f64_s(), // convert f64 to i32
+	...local.set(3),
 
 	// counter = 1
-	0x41, 0x01,  // i32.const 1
-	0x21, 0x04,  // local.set 4
+	...i32.const(1),
+	...local.set(4),
 
-	// block
-	0x02, 0x40,
-		// loop
-		0x03, 0x40,
-			0x20, 0x04, // local.get 4 (counter)
-			0x20, 0x03, // local.get 3 (exp_i32)
-			0x4e,       // i32.ge_s
-			0x0d, 0x01, // br_if 1 (break outer block)
+	...control.block(),
+		...control.loop(),
+			...local.get(4), // counter
+			...local.get(3), // the exp_i32
+			...i32.ge_s(),
+			...control.br_if(1), // break outer block
 
-			0x20, 0x02, // local.get 2 (result)
-			0x20, 0x00, // local.get 0 (base)
-			0xa2,       // f64.mul
-			0x21, 0x02, // local.set 2 (result *= base)
+			...local.get(2), // result
+			...local.get(0), // base
+			...f64.mul(), // result *= base
+			...local.set(2), // result *= base
 
-			0x20, 0x04, // local.get 4 (counter)
-			0x41, 0x01, // i32.const 1
-			0x6a,       // i32.add
-			0x21, 0x04, // local.set 4 (counter++)
+			...local.get(4), // counter
+			...i32.const(1),
+			...i32.add(), // counter++
+			...local.set(4),
 
-			0x0c, 0x00, // br 0 (repeat loop)
-		0x0b,         // end loop
-	0x0b,           // end block
+			...control.br(0), // repeat loop
+		...control.end(), // loop
+	...control.end(), // block
 
-	0x20, 0x02,     // local.get 2 (result)
-	0x0b            // end function
+	...local.get(2), // result
+	...control.end(),
 ];
 
-// biome-ignore format:
 export const boxNumberFunctionBody = [
-	// locals: 1 i32 local (temp_ptr), param is at local[0] (f64)
-	...unsignedLEB(1), // one local
-	0x01, typeCode("i32"), // local[1]: temp_ptr
+	// incoming param: f64 value
+	...local.declare("i32"), // temp_ptr
 
 	// temp_ptr = heap_ptr
-	0x23, 0x00,         // global.get 0 (assumed heap_ptr)
-	0x21, 0x01,         // local.set 1 into local[1] (temp_ptr)
+	...global.get(0),
+	...local.set(1), // local[1] = temp_ptr
 
 	// store tag = 1 (number) at temp_ptr
-	0x20, 0x01,         // local.get 1
-	0x41, 0x01,         // i32.const 1
-	0x36, 0x02, 0x00,   // i32.store offset=0
+	...local.get(1),
+	...i32.const(1),
+	...i32.store(0), // offset = 0
 
 	// store f64 at temp_ptr + 8
-	0x20, 0x01,         // local.get 1
-	0x41, 0x08,         // i32.const 8
-	0x6a,               // i32.add
-	0x20, 0x00,         // local.get 0 (f64 param)
-	0x39, 0x03, 0x00,   // f64.store offset=0
+	...local.get(1),
+	...i32.const(8),
+	...i32.add(),
+	...local.get(0), // f64 param
+	...f64.store(0), // offset = 0
 
 	// heap_ptr += 16
-	0x23, 0x00,         // global.get 0
-	0x41, 0x10,         // i32.const 16
-	0x6a,               // i32.add
-	0x24, 0x00,         // global.set 0
+	...global.get(0),
+	...i32.const(16),
+	...i32.add(),
+	...global.set(0),
 
 	// return temp_ptr
-	0x20, 0x01,         // local.get 1
-	0x0b,               // end
+	...local.get(1),
+	...control.end(),
 ];
 
-// biome-ignore format:
 export const unboxNumber = (): number[] => [
-    // 0x20, 0x00,      // local.get 0
-	0x41, 8,         // i32.const 8
-	0x6a,            // i32.add
-	0x2b, 0x03, 0x00 // f64.load align=8, offset=0
+	// incoming param: pointer to boxed number
+	...i32.const(8),
+	...i32.add(),
+	...f64.load(0), // align = 8, offset = 0
 ];
 
-// biome-ignore format:
 export const boxStringFunctionBody = [
 	// two incoming params: string offset (i32) and length (i32)
-	// locals: 1 i32 local (temp_ptr)
-	...unsignedLEB(1), // one local block
-	0x01, typeCode("i32"), // temp_ptr
+	...local.declare("i32"), // declare temp_ptr
 
 	// temp_ptr = heap_ptr
-	0x23, 0x00,         // global.get 0
-	0x21, 0x02,         // local.set 2 (temp_ptr)
+	...global.get(0),
+	...local.set(2), // temp_ptr
 
 	// store tag = 2 at (temp_ptr)
-	0x20, 0x02,         // local.get 2
-	0x41, 0x02,         // i32.const 2
-	0x36, 0x02, 0x00,   // i32.store offset=0
+	...local.get(2),
+	...i32.const(2),
+	...i32.store(0), // offset = 0
 
 	// store offset param at (temp_ptr + 4)
-	0x20, 0x02,         // local.get 2
-	0x41, 0x04,         // i32.const 4
-	0x6a,               // i32.add
-	0x20, 0x00,         // local.get 0 (offset)
-	0x36, 0x02, 0x00,   // i32.store offset=0
+	...local.get(2),
+	...i32.const(4),
+	...i32.add(),
+	...local.get(0),
+	...i32.store(0), // offset = 0
 
 	// store length param at (temp_ptr + 8)
-	0x20, 0x02,         // local.get 2
-	0x41, 0x08,         // i32.const 8
-	0x6a,               // i32.add
-	0x20, 0x01,         // local.get 1 (length)
-	0x36, 0x02, 0x00,   // i32.store offset=0
+	...local.get(2),
+	...i32.const(8),
+	...i32.add(),
+	...local.get(1),
+	...i32.store(0), // offset = 0
 
 	// heap_ptr += 16
-	0x23, 0x00,
-	0x41, 0x10,
-	0x6a,
-	0x24, 0x00,
+	...global.get(0),
+	...i32.const(16),
+	...i32.add(),
+	...global.set(0),
 
 	// return temp_ptr
-	0x20, 0x02,
-	0x0b,
+	...local.get(2),
+	...control.end(),
 ];
 
-// biome-ignore format:
 export const boxBooleanFunctionBody = [
-	...unsignedLEB(1),         // 1 local (temp_ptr)
-	0x01, typeCode("i32"),
+	// incoming param: boolean value (i32)
+	...local.declare("i32"), // temp_ptr
 
 	// temp_ptr = heap_ptr
-	0x23, 0x00,                // global.get 0
-	0x21, 0x01,                // local.set 1
+	...global.get(0),
+	...local.set(1),
 
 	// store tag = 3 (boolean)
-	0x20, 0x01,                // local.get 1
-	0x41, 0x03,                // i32.const 3
-	0x36, 0x02, 0x00,          // i32.store
+	...local.get(1),
+	...i32.const(3),
+	...i32.store(0), // offset = 0
 
 	// store boolean value at temp_ptr + 4
-	0x20, 0x01,                // local.get 1
-	0x41, 0x04,                // i32.const 4
-	0x6a,                      // i32.add
-	0x20, 0x00,                // local.get 0 (param)
-	0x36, 0x02, 0x00,          // i32.store
+	...local.get(1),
+	...i32.const(4),
+	...i32.add(),
+	...local.get(0),
+	...i32.store(0), // offset = 0
 
 	// heap_ptr += 16
-	0x23, 0x00,
-	0x41, 0x10,
-	0x6a,
-	0x24, 0x00,
+	...global.get(0),
+	...i32.const(16),
+	...i32.add(),
+	...global.set(0),
 
 	// return temp_ptr
-	0x20, 0x01,
-	0x0b,
+	...local.get(1),
+	...control.end(),
 ];
 // biome-ignore format:
 export const isTruthyFunctionBody: number[] = [
-    // Takes in one parameter: a pointer to a boxed value
-    0x00, // no locals
+    // incoming param: a pointer to a boxed value
+    ...local.declare(), // no locals
     // load tag
-    0x20, 0x00,             // local.get 0
-    0x28, 0x02, 0x00,       // i32.load (tag)
+    ...local.get(0),
+    ...i32.load(0),
 
     // if tag == 1 (number)
-    0x41, 0x01, 0x46,       // i32.const 1, i32.eq
-        0x04, 0x7f,             // if (result i32)
-        0x20, 0x00, 0x41, 0x08, 0x6a, // local.get 0 + 8
-        0x2b, 0x03, 0x00,             // f64.load
-        0x44, ...encodeF64(0),        // f64.const 0
-        0x62,                         // f64.ne
-        0x05, // else
-            // load tag again
-            0x20, 0x00, 0x28, 0x02, 0x00,
+    ...i32.const(1), ...i32.eq(),
+    ...control.if(valType("i32")), // if (result i32)
+        ...local.get(0), ...i32.const(8), ...i32.add(), // offset + 8
+        ...f64.load(0),
+        ...f64.const(0),
+        ...f64.ne(), // (number != 0)
+        ...control.else(),
+            ...local.get(0), ...i32.load(0), // load tag again
             // if tag == 3 (bool)
-            0x41, 0x03, 0x46,
-                0x04, 0x7f, // if (result i32)
-                0x20, 0x00, 0x41, 0x04, 0x6a,
-                0x28, 0x02, 0x00,
-            0x05, // else
-                // load tag again
-                0x20, 0x00, 0x28, 0x02, 0x00,
-                0x41, 0x02, 0x46,
-
-                // if (result i32)
-                0x04, 0x7f,
-                    0x20, 0x00, 0x41, 0x08, 0x6a,
-                    0x28, 0x02, 0x00,
-                    0x41, 0x00,
-                    0x47, // i32.ne (length > 0)
-                0x05,
+            ...i32.const(3), ...i32.eq(),
+                ...control.if(valType("i32")), // if (result i32)
+                ...local.get(0), ...i32.const(4), ...i32.add(), // offset + 4
+                ...i32.load(0),
+            ...control.else(),
+                ...local.get(0), ...i32.load(0), // load tag again
+                ...i32.const(2), ...i32.eq(),
+                ...control.if(valType("i32")), // if (result i32)
+                    ...local.get(0), ...i32.const(8), ...i32.add(),
+                    ...i32.load(0),
+                    ...i32.const(0),
+                    ...i32.ne(), // (length > 0)
+                ...control.else(),
                     // falsy fallback
-                    0x41, 0x00,
-                0x0b, // end string
-            0x0b, // end bool
-        0x0b, // end number
-    0x0b // end function
+                    ...i32.const(0), // return 0 (falsy)
+                ...control.end(), // end string
+            ...control.end(), // end bool
+        ...control.end(), // end number
+    ...control.end(),
 ];

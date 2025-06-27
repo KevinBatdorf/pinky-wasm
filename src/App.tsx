@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Token } from "./tokens";
 import { CodeEditor } from "./components/Editor";
-import { example } from "./assets/example";
+import { example } from "./example";
 import { TokensComponent } from "./components/Tokens";
 import { tokenize, type TokenErrorType } from "./lexer";
 import { parse } from "./parser";
