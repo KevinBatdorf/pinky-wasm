@@ -25,7 +25,7 @@ export const ASTComponent = ({
 	const randomId = Math.random().toString(36).substring(2, 15);
 
 	return (
-		<div className="flex-grow pb-60 cursor-default flex flex-col gap-1.5">
+		<div className="flex-grow pb-60 cursor-default flex flex-col gap-0.5">
 			{ast.body.map((statement, index) => (
 				<StatementDisplay
 					handleLeave={handleLeave}
@@ -396,9 +396,14 @@ const ExpressionDisplay = ({
 					onMouseEnter={() => handleHover(expression.loc)}
 					onMouseLeave={handleLeave}
 				>
-					<div className={getColor(indent)}>{expression.type}</div>
-					<div style={{ marginLeft: `${indent * 8}px` }} className="">
-						<span className="text-[#A6DA95]">"{expression.value}"</span>
+					<div className={getColor(indent)}>
+						<span className="font-sans">└</span> {expression.type}
+					</div>
+					<div
+						style={{ marginLeft: `${indent * 8}px` }}
+						className="text-[#A6DA95] mt-1"
+					>
+						<span className="invisible">└</span> "{expression.value}"
 					</div>
 				</div>
 			);
@@ -409,9 +414,14 @@ const ExpressionDisplay = ({
 					onMouseEnter={() => handleHover(expression.loc)}
 					onMouseLeave={handleLeave}
 				>
-					<div className={getColor(indent)}>{expression.type}</div>
-					<div style={{ marginLeft: `${indent * 8}px` }} className="">
-						<span className="text-[#F5A97F]">{String(expression.value)}</span>
+					<div className={getColor(indent)}>
+						<span className="font-sans">└</span> {expression.type}
+					</div>
+					<div
+						style={{ marginLeft: `${indent * 8}px` }}
+						className="text-[#F5A97F]"
+					>
+						<span className="invisible">└</span> {String(expression.value)}
 					</div>
 				</div>
 			);
@@ -422,9 +432,14 @@ const ExpressionDisplay = ({
 					onMouseEnter={() => handleHover(expression.loc)}
 					onMouseLeave={handleLeave}
 				>
-					<div className={getColor(indent)}>{expression.type}</div>
-					<div style={{ marginLeft: `${indent * 8}px` }} className="">
-						<span className="text-[#ED8796]">{String(expression.value)}</span>
+					<div className={getColor(indent)}>
+						<span className="font-sans">└</span> {expression.type}
+					</div>
+					<div
+						style={{ marginLeft: `${indent * 8}px` }}
+						className="text-[#ED8796]"
+					>
+						<span className="invisible">└</span> {String(expression.value)}
 					</div>
 				</div>
 			);
@@ -437,7 +452,7 @@ const ExpressionDisplay = ({
 							onMouseEnter={() => handleHover(expression.loc)}
 							onMouseLeave={handleLeave}
 						>
-							{expression.type}
+							<span className="font-sans">└</span> {expression.type}
 						</div>
 						<ExpressionDisplay
 							expression={expression.name}
@@ -447,9 +462,6 @@ const ExpressionDisplay = ({
 						/>
 					</div>
 					<div style={{ marginLeft: `${indent * 8}px` }} className="">
-						{expression.args.length ? (
-							<div className={getColor(indent)}>Args:</div>
-						) : null}
 						{expression.args.map((arg, index) => (
 							<ExpressionDisplay
 								key={index + randomId}
@@ -471,7 +483,7 @@ const ExpressionDisplay = ({
 							onMouseEnter={() => handleHover(expression.loc)}
 							onMouseLeave={handleLeave}
 						>
-							{expression.type}
+							<span className="font-sans">└</span> {expression.type}
 						</div>
 						<ExpressionDisplay
 							expression={expression.left}
@@ -479,9 +491,11 @@ const ExpressionDisplay = ({
 							handleHover={handleHover}
 							handleLeave={handleLeave}
 						/>
-						<div>
-							<span className={getColor(indent)}>op:</span>
-							<span className="text-[#8BD5CA]"> {expression.operator}</span>
+						<div
+							style={{ marginLeft: `${indent * 8}px` }}
+							className="text-[#8BD5CA] mb-1"
+						>
+							<span className="invisible">└</span> {expression.operator}
 						</div>
 						<ExpressionDisplay
 							expression={expression.right}
@@ -500,11 +514,13 @@ const ExpressionDisplay = ({
 						onMouseEnter={() => handleHover(expression.loc)}
 						onMouseLeave={handleLeave}
 					>
-						{expression.type}
+						<span className="font-sans">└</span> {expression.type}
 					</div>
-					<div style={{ marginLeft: `${indent * 8}px` }} className="">
-						<span className={getColor(indent)}>op:</span>
-						<span className="text-[#8BD5CA]"> {expression.operator}</span>
+					<div
+						style={{ marginLeft: `${indent * 8}px` }}
+						className="text-[#8BD5CA] mb-1"
+					>
+						<span className="invisible">└</span> {expression.operator}
 					</div>
 					<ExpressionDisplay
 						expression={expression.argument}
@@ -521,12 +537,14 @@ const ExpressionDisplay = ({
 					onMouseEnter={() => handleHover(expression.loc)}
 					onMouseLeave={handleLeave}
 				>
-					<div className={getColor(indent)}>{expression.type}</div>
+					<div className={getColor(indent)}>
+						<span className="font-sans">└</span> {expression.type}
+					</div>
 					<div
 						style={{ marginLeft: `${indent * 8}px` }}
-						className="text-[#CAD3F5]"
+						className="text-[#CAD3F5] mb-1"
 					>
-						{expression.name}
+						<span className="invisible">└</span> {expression.name}
 					</div>
 				</div>
 			);
@@ -538,7 +556,7 @@ const ExpressionDisplay = ({
 						onMouseEnter={() => handleHover(expression.loc)}
 						onMouseLeave={handleLeave}
 					>
-						{expression.type}
+						<span className="font-sans">└</span> {expression.type}
 					</div>
 					<ExpressionDisplay
 						expression={expression.expression}
