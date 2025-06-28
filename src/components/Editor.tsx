@@ -9,6 +9,7 @@ import {
 import type { Location } from "../syntax";
 import type { ParseErrorType } from "../parser";
 import type { TokenErrorType } from "../lexer";
+import type { CompilerErrorType } from "../compiler";
 
 type CodeEditorProps = {
 	value: string;
@@ -16,6 +17,7 @@ type CodeEditorProps = {
 	hovered: Location | null;
 	parseError?: ParseErrorType;
 	tokenError?: TokenErrorType;
+	compilerError?: CompilerErrorType;
 };
 
 export const CodeEditor = (props: CodeEditorProps) => {
@@ -27,8 +29,56 @@ export const CodeEditor = (props: CodeEditorProps) => {
 		hovered,
 		parseError,
 		tokenError,
+		compilerError,
 		...remainingProps
 	} = props;
+
+	const updateCommentedLines = (
+		value: string,
+		selectionStart: number,
+		selectionEnd: number,
+	) => {
+		const lines = value.split("\n");
+		let charCount = 0;
+		let newSelectionStart = selectionStart;
+		let newSelectionEnd = selectionEnd;
+
+		const newLines = lines.map((line) => {
+			const lineStart = charCount;
+			const lineEnd = charCount + line.length;
+
+			let newLine = line;
+			if (
+				// line is within selection
+				(selectionStart <= lineEnd && selectionEnd > lineStart) ||
+				(selectionStart === selectionEnd &&
+					selectionStart >= lineStart &&
+					selectionStart <= lineEnd) // single cursor
+			) {
+				if (line.startsWith("--")) {
+					newLine = line.replace(/^--\s?/, "");
+					if (selectionStart > lineStart)
+						newSelectionStart -= line.length - newLine.length;
+					if (selectionEnd > lineStart)
+						newSelectionEnd -= line.length - newLine.length;
+				} else {
+					newLine = `-- ${line}`;
+					if (selectionStart > lineStart)
+						newSelectionStart += newLine.length - line.length;
+					if (selectionEnd > lineStart)
+						newSelectionEnd += newLine.length - line.length;
+				}
+			}
+			charCount += line.length + 1; // +1 for \n
+			return newLine;
+		});
+
+		return {
+			newValue: newLines.join("\n"),
+			newSelectionStart,
+			newSelectionEnd,
+		};
+	};
 
 	useEffect(() => {
 		createHighlighter({
@@ -47,7 +97,7 @@ export const CodeEditor = (props: CodeEditorProps) => {
 
 	const decorations = useMemo<DecorationItem[]>(() => {
 		if (!highlighter || !value) return [];
-		if (!hovered && !parseError && !tokenError) return [];
+		if (!hovered && !parseError && !tokenError && !compilerError) return [];
 
 		const newDecorations: DecorationItem[] = [];
 		if (hovered) {
@@ -82,8 +132,19 @@ export const CodeEditor = (props: CodeEditorProps) => {
 				properties: { class: "error-token" },
 			});
 		}
+		if (compilerError) {
+			const { line, column, tokenLength } = compilerError;
+			newDecorations.push({
+				start: { line: line - 1, character: column - 1 },
+				end: {
+					line: line - 1,
+					character: column - 1 + (tokenLength || 1),
+				},
+				properties: { class: "error-token" },
+			});
+		}
 		return newDecorations;
-	}, [hovered, highlighter, parseError, value, tokenError]);
+	}, [hovered, highlighter, parseError, compilerError, value, tokenError]);
 
 	if (!highlighter) return null;
 
@@ -94,7 +155,27 @@ export const CodeEditor = (props: CodeEditorProps) => {
 				value={value}
 				onValueChange={onChange}
 				onClick={() => onChange(value)}
-				onKeyDown={() => onChange(value)}
+				onKeyDown={(e) => {
+					onChange(value);
+					// comment or uncomment if cmd+/ is pressed
+					if (e.metaKey && e.key === "/") {
+						e.preventDefault();
+						const textarea = textAreaRef.current?.querySelector("textarea");
+						if (!textarea) return;
+						const { selectionStart, selectionEnd } = textarea;
+						const { newValue, newSelectionStart, newSelectionEnd } =
+							updateCommentedLines(value, selectionStart, selectionEnd);
+						onChange(newValue);
+
+						requestAnimationFrame(() => {
+							const textarea = textAreaRef.current?.querySelector("textarea");
+							if (!textarea) return;
+							textarea.selectionStart = newSelectionStart;
+							textarea.selectionEnd = newSelectionEnd;
+							textarea.focus();
+						});
+					}
+				}}
 				{...remainingProps}
 				padding={16}
 				style={{

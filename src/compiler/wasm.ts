@@ -146,17 +146,27 @@ export const f64 = {
 	store: (offset = 0): number[] => [0x39, 0x03, ...unsignedLEB(offset)],
 };
 export const control = {
-	block: (type = valType("void")): number[] => [0x02, ...unsignedLEB(type)],
-	loop: (type = valType("void")): number[] => [0x03, ...unsignedLEB(type)],
-	if: (type = valType("void")): number[] => [0x04, ...unsignedLEB(type)],
-	else: (): number[] => [0x05],
 	end: (): number[] => [0x0b],
+};
+export const block = {
+	start: (type = valType("void")): number[] => [0x02, ...unsignedLEB(type)],
+	end: (): number[] => control.end(),
+};
+export const if_ = {
+	start: (type = valType("void")): number[] => [0x04, ...unsignedLEB(type)],
+	else: (): number[] => [0x05],
+	end: (): number[] => control.end(),
+};
+export const loop = {
+	start: (type = valType("void")): number[] => [0x03, ...unsignedLEB(type)],
 	br: (labelIndex: number): number[] => [0x0c, ...unsignedLEB(labelIndex)],
 	br_if: (labelIndex: number): number[] => [0x0d, ...unsignedLEB(labelIndex)],
-	return: (): number[] => [0x0f],
+	end: (): number[] => control.end(),
 };
 export const fn = {
 	call: (index: number): number[] => [0x10, ...unsignedLEB(index)],
+	return: (): number[] => [0x0f],
+	end: (): number[] => control.end(),
 };
 export const memory = {
 	size: (index = 0) => [0x3f, index],
@@ -196,7 +206,7 @@ export const modFunctionBody = [
 	...f64.trunc(), // trunc to integer
 	...f64.mul(),   // multiply by right
 	...f64.sub(),   // subtract -> yields a - b * floor(a/b)
-	...control.end(),
+	...fn.end(),
 ];
 
 // biome-ignore format:
@@ -207,7 +217,7 @@ export const powFunctionBody = [
 	...local.get(1), // the exp
 	...f64.const(0),
 	...f64.lt(),
-	...control.if(), // if (exp < 0)
+	...if_.start(), // if (exp < 0)
 		...f64.const(1),
 		...local.get(0), // the base
 		...f64.div(),
@@ -215,7 +225,7 @@ export const powFunctionBody = [
 		...local.get(1), // the exp
 		...f64.neg(),
 		...local.set(1), // exp = -exp
-	...control.end(),
+	...if_.end(),
 
 	// result = base
 	...local.get(0), // the base
@@ -230,12 +240,12 @@ export const powFunctionBody = [
 	...i32.const(1),
 	...local.set(4),
 
-	...control.block(),
-		...control.loop(),
+	...block.start(),
+		...loop.start(),
 			...local.get(4), // counter
 			...local.get(3), // the exp_i32
 			...i32.ge_s(),
-			...control.br_if(1), // break outer control.block()
+			...loop.br_if(1), // break outer
 
 			...local.get(2), // result
 			...local.get(0), // base
@@ -247,12 +257,12 @@ export const powFunctionBody = [
 			...i32.add(), // counter++
 			...local.set(4),
 
-			...control.br(0), // repeat control.loop()
-		...control.end(), // loop
-	...control.end(), // block
+			...loop.br(0), // repeat loop
+		...loop.end(),
+	...block.end(),
 
 	...local.get(2), // result
-	...control.end(),
+	...fn.end(),
 ];
 
 export const boxNumberFunctionBody = [
@@ -283,7 +293,7 @@ export const boxNumberFunctionBody = [
 
 	// return temp_ptr
 	...local.get(1),
-	...control.end(),
+	...fn.end(),
 ];
 
 export const unboxNumberFunctionBody = [
@@ -293,7 +303,7 @@ export const unboxNumberFunctionBody = [
 	...i32.const(8),
 	...i32.add(),
 	...f64.load(0), // align = 8, offset = 0
-	...control.end(),
+	...fn.end(),
 ];
 
 export const boxStringFunctionBody = [
@@ -331,7 +341,7 @@ export const boxStringFunctionBody = [
 
 	// return temp_ptr
 	...local.get(2),
-	...control.end(),
+	...fn.end(),
 ];
 
 export const boxBooleanFunctionBody = [
@@ -362,7 +372,7 @@ export const boxBooleanFunctionBody = [
 
 	// return temp_ptr
 	...local.get(1),
-	...control.end(),
+	...fn.end(),
 ];
 // biome-ignore format:
 export const isTruthyFunctionBody: number[] = [
@@ -374,31 +384,31 @@ export const isTruthyFunctionBody: number[] = [
 
     // if tag == 1 (number)
     ...i32.const(1), ...i32.eq(),
-    ...control.if(valType("i32")), // if (result i32)
+    ...if_.start(valType("i32")), // if (result i32)
         ...local.get(0), ...i32.const(8), ...i32.add(), // offset + 8
         ...f64.load(0),
         ...f64.const(0),
         ...f64.ne(), // (number != 0)
-        ...control.else(),
+        ...if_.else(),
             ...local.get(0), ...i32.load(0), // load tag again
             // if tag == 3 (bool)
             ...i32.const(3), ...i32.eq(),
-                ...control.if(valType("i32")), // if (result i32)
+                ...if_.start(valType("i32")), // if (result i32)
                 ...local.get(0), ...i32.const(4), ...i32.add(), // offset + 4
                 ...i32.load(0),
-            ...control.else(),
+            ...if_.else(),
                 ...local.get(0), ...i32.load(0), // load tag again
                 ...i32.const(2), ...i32.eq(),
-                ...control.if(valType("i32")), // if (result i32)
+                ...if_.start(valType("i32")), // if (result i32)
                     ...local.get(0), ...i32.const(8), ...i32.add(),
                     ...i32.load(0),
                     ...i32.const(0),
                     ...i32.ne(), // (length > 0)
-                ...control.else(),
+                ...if_.else(),
                     // falsy fallback
                     ...i32.const(0), // return 0 (falsy)
-                ...control.end(), // end string
-            ...control.end(), // end bool
-        ...control.end(), // end number
-    ...control.end(),
+                ...if_.end(), // end string
+            ...if_.end(), // end bool
+        ...if_.end(), // end number
+    ...fn.end(),
 ];

@@ -210,6 +210,7 @@ function App() {
 						<CodeEditor
 							parseError={astError}
 							tokenError={tokenError}
+							compilerError={compilerError}
 							hovered={hovered}
 							value={code}
 							onChange={handleOnChange}

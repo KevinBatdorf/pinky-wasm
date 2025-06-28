@@ -15,9 +15,17 @@ beforeAll(async () => {
 });
 
 // test.only("prints to wasm binary file", async () => {
-// 	const input = `for i := 1, 5 do
-//     print i
-// end`;
+// 	const input = `x := 1
+
+// func foo(a, b)
+//   c := a + b
+//   println c
+//   ret true
+// end
+
+// foo(1,2)
+
+// `;
 // 	const { tokens } = tokenize(input);
 // 	const { ast } = parse(tokens);
 // 	const { bytes, error } = compile(ast);

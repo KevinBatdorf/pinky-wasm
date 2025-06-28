@@ -27,10 +27,11 @@ const findScopeForVar = (name: string): Scope => {
 	return getCurrentScope(); // fallsback to the last scope
 };
 
-let nextLocalIndex = 0; // for local variables
-export const resetLocalIndex = () => {
-	nextLocalIndex = 0;
+let nextLocalVarsIndex = 0; // for local variables and function parameters
+export const setLocalVarsIndex = (index: number) => {
+	nextLocalVarsIndex = index;
 };
+export const getLocalVarsIndex = (): number => nextLocalVarsIndex;
 export const declareVar = (name: string, isLocal: boolean): VarInfo | null => {
 	if (isLocal && scopes.at(-1)?.has(name)) {
 		// Cant do local x := 1 twice in the same scope
@@ -38,7 +39,9 @@ export const declareVar = (name: string, isLocal: boolean): VarInfo | null => {
 	}
 	const scope = isLocal ? scopes.at(-1) : findScopeForVar(name);
 	if (!scope) throw new Error(`No scope found for variable "${name}"`);
-	const index = scope.has(name) ? scope?.get(name)?.index : nextLocalIndex++;
+	const index = scope.has(name)
+		? scope?.get(name)?.index
+		: nextLocalVarsIndex++;
 	if (typeof index === "undefined") {
 		throw new Error(`Failed to get index for variable "${name}"`);
 	}
@@ -46,28 +49,23 @@ export const declareVar = (name: string, isLocal: boolean): VarInfo | null => {
 	scope.set(name, varInfo);
 	return varInfo;
 };
-export const getVar = (name: string): VarInfo => {
-	const varInfo = findScopeForVar(name)?.get(name);
-	if (!varInfo)
-		throw new Error(`Variable "${name}" not found in current scope`);
-	return varInfo;
-};
+export const getVar = (name: string): VarInfo | undefined =>
+	findScopeForVar(name)?.get(name);
 // For temporary variables, we use a special index
 let scratchIndex: number | null = null;
-export const resetScratchIndex = () => {
-	scratchIndex = null;
+export const setScratchIndex = (v: number | null) => {
+	scratchIndex = v;
 };
-// TODO: support f64
 export const getScratchIndex = (): number => {
-	if (scratchIndex === null) scratchIndex = nextLocalIndex++;
+	if (scratchIndex === null) scratchIndex = nextLocalVarsIndex++;
 	return scratchIndex;
 };
 
 export const getLocalDecls = () =>
-	nextLocalIndex > 0
+	nextLocalVarsIndex > 0
 		? [
 				...unsignedLEB(1), // 1 type group
-				...unsignedLEB(nextLocalIndex), // N locals
+				...unsignedLEB(nextLocalVarsIndex), // N locals
 				valType("i32"), // all locals are boxed i32
 			]
 		: unsignedLEB(0); // no locals

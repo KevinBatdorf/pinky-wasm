@@ -1,12 +1,17 @@
 import {
+	addFunctionBody,
+	addUserDefinedFunction,
+	clearUserDefinedFunctions,
 	definedFunctions,
 	func,
 	functionBodies,
-	functionTypeMap,
-	functionTypes,
 	getFunctionTypeKey,
+	getFunctionTypes,
+	hasReturn,
 	importFunctions,
-} from "./compiler/imports";
+	resetFunctionBodies,
+	userDefinedFunctions,
+} from "./compiler/functions";
 import type { AST } from "./parser";
 import {
 	clearScopes,
@@ -15,10 +20,11 @@ import {
 	enterScope,
 	exitScope,
 	getLocalDecls,
+	getLocalVarsIndex,
 	getScratchIndex,
 	getVar,
-	resetLocalIndex,
-	resetScratchIndex,
+	setLocalVarsIndex,
+	setScratchIndex,
 } from "./compiler/state";
 import type { Expression, Statement } from "./syntax";
 import {
@@ -32,9 +38,29 @@ import {
 	f64,
 	control,
 	fn,
+	block,
+	loop,
+	if_,
 } from "./compiler/wasm";
 
-export type CompilerErrorType = Error | null;
+class CompilerError extends Error {
+	line: number;
+	column: number;
+	tokenLength: number;
+	constructor(
+		message: string,
+		line: number,
+		column: number,
+		tokenLength: number,
+	) {
+		super(message);
+		this.name = "CompilerError";
+		this.line = line;
+		this.column = column;
+		this.tokenLength = tokenLength;
+	}
+}
+export type CompilerErrorType = null | CompilerError;
 
 export const compile = (
 	ast: AST,
@@ -54,7 +80,11 @@ export const compile = (
 		}
 		bytes = _compile(ast, strings);
 	} catch (err) {
-		error = err instanceof Error ? err : new Error(String(err));
+		if (err instanceof CompilerError) {
+			error = err;
+		} else {
+			console.error("Compilation error:", err);
+		}
 	}
 	return { bytes, error, meta: { strings: strings.getBytes() } };
 };
@@ -65,15 +95,48 @@ const _compile = (
 ): Uint8Array => {
 	// Reset state for each compilation
 	clearScopes();
-	resetLocalIndex();
-	resetScratchIndex();
+	setLocalVarsIndex(0);
+	setScratchIndex(null);
+	clearUserDefinedFunctions();
+	resetFunctionBodies();
 
 	// WASM magic + version
 	const header = new Uint8Array([
 		0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
 	]);
 
-	// Type section (handles signature for print/println)
+	// Function section
+	const mainFunc = mainFuncBody(ast, strings); // compiles
+	addFunctionBody("main", mainFunc);
+	const { functionTypes, functionIndices } = getFunctionTypes();
+	console.log("Function types:", functionTypes, functionIndices, func());
+	const funcSection = emitSection(
+		3,
+		new Uint8Array([
+			// loop over the defined functions and get their type indices
+			...unsignedLEB(definedFunctions.length + userDefinedFunctions.length),
+			...definedFunctions.flatMap((def) => {
+				const key = getFunctionTypeKey(def.type);
+				const typeIndex = functionIndices.get(key);
+				if (typeIndex === undefined) {
+					throw new Error(`Type not found for function "${def.name}"`);
+				}
+				return unsignedLEB(typeIndex);
+			}),
+			...userDefinedFunctions.flatMap((func) => {
+				const key = getFunctionTypeKey(func.type);
+				const typeIndex = functionIndices.get(key);
+				if (typeIndex === undefined) {
+					throw new Error(
+						`Type not found for user-defined function "${func.name}"`,
+					);
+				}
+				return unsignedLEB(typeIndex);
+			}),
+		]),
+	);
+
+	// Type section for all functions
 	const typeSection = emitSection(
 		1,
 		// biome-ignore format:
@@ -90,7 +153,7 @@ const _compile = (
 			...unsignedLEB(importFunctions.length),
 			...importFunctions.flatMap((imp) => {
 				const key = getFunctionTypeKey(imp.type);
-				const typeIndex = functionTypeMap.get(key);
+				const typeIndex = functionIndices.get(key);
 				if (typeIndex === undefined) {
 					throw new Error(`Type not found for import "${imp.name}"`);
 				}
@@ -100,23 +163,6 @@ const _compile = (
 					0x00, // function import
 					...unsignedLEB(typeIndex),
 				];
-			}),
-		]),
-	);
-
-	// Function section
-	const funcSection = emitSection(
-		3,
-		new Uint8Array([
-			// loop over the defined functions and get their type indices
-			...unsignedLEB(definedFunctions.length),
-			...definedFunctions.flatMap((def) => {
-				const key = getFunctionTypeKey(def.type);
-				const typeIndex = functionTypeMap.get(key);
-				if (typeIndex === undefined) {
-					throw new Error(`Type not found for function "${def.name}"`);
-				}
-				return unsignedLEB(typeIndex);
 			}),
 		]),
 	);
@@ -140,7 +186,7 @@ const _compile = (
 			...encodeString("main"),
 			0x00, // export kind: func
 			// main is exported after imports (print/println)
-			...unsignedLEB(func.main),
+			...unsignedLEB(func().main),
 			// export "memory" = memory 0
 			...encodeString("memory"),
 			0x02, // export kind: memory
@@ -149,15 +195,20 @@ const _compile = (
 	);
 
 	// Code section
-	const mainFunc = mainFuncBody(ast, strings);
-	functionBodies.main = mainFunc;
 	const codeSection = emitSection(
 		10,
 		new Uint8Array([
-			...unsignedLEB(definedFunctions.length),
+			...unsignedLEB(Object.keys(functionBodies).length),
 			...definedFunctions.flatMap((def) => {
 				const body = functionBodies[def.name];
 				if (!body) throw new Error(`Function body for "${def.name}" not found`);
+				return [...unsignedLEB(body.length), ...body];
+			}),
+			...userDefinedFunctions.flatMap((func) => {
+				const body = functionBodies[func.name];
+				if (!body) {
+					throw new Error(`Function body for "${func.name}" not found`);
+				}
 				return [...unsignedLEB(body.length), ...body];
 			}),
 		]),
@@ -177,7 +228,7 @@ const _compile = (
 		]),
 	);
 
-	// This is listed out of order becasue we need to calc the heap size
+	// Keep at the end to set heap ptr from string length
 	const globalSection = emitSection(
 		6,
 		new Uint8Array([
@@ -228,19 +279,14 @@ const compileStatement = (
 	stmt: Statement,
 	strings: ReturnType<typeof createStringTable>,
 ): number[] => {
-	const instructions: number[] = [];
 	switch (stmt.type) {
 		case "PrintlnStatement": {
 			const bytes = compileExpression(stmt.expression, strings);
-			instructions.push(...bytes);
-			instructions.push(...fn.call(func.println));
-			break;
+			return [...bytes, ...fn.call(func().println)];
 		}
 		case "PrintStatement": {
 			const bytes = compileExpression(stmt.expression, strings);
-			instructions.push(...bytes);
-			instructions.push(...fn.call(func.print));
-			break;
+			return [...bytes, ...fn.call(func().print)];
 		}
 		case "LocalAssignStatement":
 		case "AssignStatement": {
@@ -249,10 +295,14 @@ const compileStatement = (
 			const bytes = compileExpression(expression, strings);
 			const varInfo = declareVar(identifier.name, isLocal);
 			if (!varInfo) {
-				throw new Error(`Failed to declare variable "${identifier.name}"`);
+				throw new CompilerError(
+					`Variable "${identifier.name}" is not declared`,
+					identifier.loc.start.line,
+					identifier.loc.start.column,
+					identifier.name.length,
+				);
 			}
-			instructions.push(...bytes, ...local.set(varInfo.index)); // set the variable
-			break;
+			return [...bytes, ...local.set(varInfo.index)]; // set the variable
 		}
 		case "IfStatement": {
 			const condition = compileExpression(stmt.condition, strings);
@@ -261,8 +311,8 @@ const compileStatement = (
 			exitScope();
 			const bytes = [
 				...condition,
-				...fn.call(func.is_truthy),
-				...control.if(),
+				...fn.call(func().is_truthy),
+				...if_.start(),
 				...thenBranch,
 			];
 			let elseBlock: number[] = [];
@@ -281,19 +331,17 @@ const compileStatement = (
 					exitScope();
 					elseBlock = [
 						...condition,
-						...fn.call(func.is_truthy),
-						...control.if(),
+						...fn.call(func().is_truthy),
+						...if_.start(),
 						...elifBranch,
-						...control.else(),
+						...if_.else(),
 						...elseBlock, // else block needs to be repositioned
-						...control.end(),
+						...if_.end(),
 					];
 				}
 			}
 			// Add the final elseBlock to the original if
-			bytes.push(...control.else(), ...elseBlock, ...control.end());
-			instructions.push(...bytes);
-			break;
+			return [...bytes, ...if_.else(), ...elseBlock, ...if_.end()];
 		}
 		case "WhileStatement": {
 			enterScope();
@@ -304,28 +352,36 @@ const compileStatement = (
 			exitScope();
 			// biome-ignore format:
 			return [
-				...control.block(),
-                ...control.loop(),
+				...block.start(),
+                ...loop.start(),
                     ...condition,
-                    ...fn.call(func.is_truthy),
+                    ...fn.call(func().is_truthy),
                     ...i32.eqz(), // check if condition is false
-                    ...control.br_if(1), // break out of outer block
+                    ...loop.br_if(1), // break out of outer block
                     ...body,
-                    ...control.br(0), // loop back
-                ...control.end(),
-                ...control.end(),
+                    ...loop.br(0), // loop back
+                ...loop.end(),
+                ...block.end(),
 			];
 		}
 		case "ForStatement": {
 			const { assignment, condition, increment, body } = stmt;
 			enterScope();
 			const init = compileStatement(assignment, strings);
-			const { index: loopVarIndex } = getVar(assignment.identifier.name);
+			const loopVar = getVar(assignment.identifier.name);
+			if (!loopVar) {
+				throw new CompilerError(
+					`Variable "${assignment.identifier.name}" is not declared`,
+					assignment.identifier.loc.start.line,
+					assignment.identifier.loc.start.column,
+					assignment.identifier.name.length,
+				);
+			}
 			enterScope(); // inner scope for the loop body
 			const cond = compileExpression(condition, strings);
 			const step = increment
 				? compileExpression(increment, strings)
-				: [...f64.const(1), ...fn.call(func.box_number)]; // default increment is 1
+				: [...f64.const(1), ...fn.call(func().box_number)]; // default increment is 1
 			const loopBody = compileStatements(body, strings);
 			exitScope(); // exit inner
 			exitScope();
@@ -334,49 +390,85 @@ const compileStatement = (
 			return [
                 ...init, // e.g. i := 0
                 ...step,
-                ...fn.call(func.unbox_number),
+                ...fn.call(func().unbox_number),
                 ...f64.const(0),
                 ...f64.lt(), // step < 0 ?
                 ...local.set(isDescending),
 
-                ...control.block(),
-                ...control.loop(),
+                ...block.start(),
+                ...loop.start(),
                     ...local.get(isDescending),
-                    ...control.if(valType("i32")), // descending case
-                        ...local.get(loopVarIndex),
-                        ...fn.call(func.unbox_number),
+                    ...if_.start(valType("i32")), // descending case
+                        ...local.get(loopVar.index),
+                        ...fn.call(func().unbox_number),
                         ...cond,
-                        ...fn.call(func.unbox_number),
+                        ...fn.call(func().unbox_number),
                         ...f64.lt(), // i < cond ? 1 : 0
-                    ...control.else(), // ascending case
-                        ...local.get(loopVarIndex),
-                        ...fn.call(func.unbox_number),
+                    ...if_.else(), // ascending case
+                        ...local.get(loopVar.index),
+                        ...fn.call(func().unbox_number),
                         ...cond,
-                        ...fn.call(func.unbox_number),
+                        ...fn.call(func().unbox_number),
                         ...f64.gt(), // i > cond ? 1 : 0
-                    ...control.end(),
-                    ...control.br_if(1), // exit if 1
+                    ...if_.end(),
+                    ...loop.br_if(1), // exit if 1
 
                     ...loopBody,
 
                     // increment the loop variable
-                    ...local.get(loopVarIndex),
-                    ...fn.call(func.unbox_number),
+                    ...local.get(loopVar.index),
+                    ...fn.call(func().unbox_number),
                     ...step,
-                    ...fn.call(func.unbox_number),
+                    ...fn.call(func().unbox_number),
                     ...f64.add(),
-                    ...fn.call(func.box_number),
-                    ...local.set(loopVarIndex),
+                    ...fn.call(func().box_number),
+                    ...local.set(loopVar.index),
 
-                    ...control.br(0), // loop back
-                ...control.end(),
-                ...control.end(),
+                    ...loop.br(0), // loop back
+                ...loop.end(),
+                ...block.end(),
             ];
 		}
+		case "FunctionDeclStatement": {
+			const { name, params, body } = stmt;
+			if (userDefinedFunctions.some((f) => f.name === name.name)) {
+				throw new CompilerError(
+					`Function "${name.name}" is already defined`,
+					name.loc.start.line,
+					name.loc.start.column,
+					name.name.length,
+				);
+			}
+			const paramTypes = params.map(() => valType("i32")); // boxed i32
+			const returnType = hasReturn(body) ? [valType("i32")] : [];
+			addUserDefinedFunction(name.name, paramTypes, returnType);
+			const prevIndex = getLocalVarsIndex();
+			setLocalVarsIndex(0); // temp set to collect fn params
+			enterScope();
+			for (const param of params) declareVar(param.name, true);
+			const bodyBytes = compileStatements(body, strings);
+			exitScope();
+			const localDecls = getLocalDecls();
+			setLocalVarsIndex(prevIndex); // restore local vars index
+			addFunctionBody(name.name, [
+				...localDecls,
+				...bodyBytes,
+				...control.end(),
+			]);
+			return [];
+		}
+		case "ReturnStatement": {
+			return [
+				...compileExpression(stmt.expression, strings),
+				...fn.call(func().ret),
+			];
+		}
+		case "ExpressionStatement": {
+			return compileExpression(stmt.expression, strings);
+		}
 		default:
-			throw new Error(`Unsupported statement type: ${stmt.type}`);
+			throw new Error("Something went wrong");
 	}
-	return instructions;
 };
 
 const comparisonOps = new Set(["==", "~=", ">", ">=", "<", "<="]);
@@ -392,18 +484,26 @@ const compileExpression = (
 			return [
 				...i32.const(offset),
 				...i32.const(length),
-				...fn.call(func.box_string),
+				...fn.call(func().box_string),
 			];
 		}
 		case "NumberLiteral": {
-			return [...f64.const(expr.value), ...fn.call(func.box_number)];
+			return [...f64.const(expr.value), ...fn.call(func().box_number)];
 		}
 		case "BooleanLiteral":
-			return [...i32.const(expr.value ? 1 : 0), ...fn.call(func.box_bool)];
+			return [...i32.const(expr.value ? 1 : 0), ...fn.call(func().box_bool)];
 		case "Identifier": {
-			const { index } = getVar(expr.name);
+			const variable = getVar(expr.name);
+			if (!variable) {
+				throw new CompilerError(
+					`Variable "${expr.name}" is not declared`,
+					expr.loc.start.line,
+					expr.loc.start.column,
+					expr.name.length,
+				);
+			}
 			// All vars are boxed i32, so just get the pointer
-			return local.get(index);
+			return local.get(variable.index);
 		}
 		case "GroupingExpression":
 			return compileExpression(expr.expression, strings);
@@ -415,38 +515,38 @@ const compileExpression = (
 			if (nativeOp !== null) {
 				const ops: number[] = [
 					...left,
-					...fn.call(func.unbox_number),
+					...fn.call(func().unbox_number),
 					...right,
-					...fn.call(func.unbox_number),
+					...fn.call(func().unbox_number),
 					nativeOp,
 				];
 				// comparing f64, f64 results in i32 so convert it back to f64
 				if (comparisonOps.has(expr.operator)) {
-					ops.push(...fn.call(func.box_bool));
+					ops.push(...fn.call(func().box_bool));
 					return ops;
 				}
-				ops.push(...fn.call(func.box_number));
+				ops.push(...fn.call(func().box_number));
 				return ops;
 			}
 			switch (expr.operator) {
 				case "%":
 					return [
 						...left,
-						...fn.call(func.unbox_number),
+						...fn.call(func().unbox_number),
 						...right,
-						...fn.call(func.unbox_number),
-						...fn.call(func.mod), // call mod -> f64
-						...fn.call(func.box_number), // box the result
+						...fn.call(func().unbox_number),
+						...fn.call(func().mod), // call mod -> f64
+						...fn.call(func().box_number), // box the result
 					];
 				case "^":
 					// TODO write runtime error if exp is not an integer
 					return [
 						...left,
-						...fn.call(func.unbox_number),
+						...fn.call(func().unbox_number),
 						...right,
-						...fn.call(func.unbox_number),
-						...fn.call(func.pow),
-						...fn.call(func.box_number),
+						...fn.call(func().unbox_number),
+						...fn.call(func().pow),
+						...fn.call(func().box_number),
 					];
 				case "and": {
 					const scratch = getScratchIndex();
@@ -455,12 +555,12 @@ const compileExpression = (
                         ...left, // evaluate A
                         ...local.set(scratch),
                         ...local.get(scratch),
-                        ...fn.call(func.is_truthy),
-                        ...control.if(valType("i32")),
+                        ...fn.call(func().is_truthy),
+                        ...if_.start(valType("i32")),
                             ...right, // evaluate and return B
-                        ...control.else(),
+                        ...if_.else(),
                             ...local.get(scratch), // return A
-                        ...control.end(),
+                        ...if_.end(),
                     ];
 				}
 				case "or": {
@@ -470,12 +570,12 @@ const compileExpression = (
                         ...left, // evaluate A
                         ...local.set(scratch),
                         ...local.get(scratch),
-                        ...fn.call(func.is_truthy),
-                        ...control.if(valType("i32")),
+                        ...fn.call(func().is_truthy),
+                        ...if_.start(valType("i32")),
                             ...local.get(scratch), //return A
-                        ...control.else(),
+                        ...if_.else(),
                             ...right, // evaluate and return B
-                        ...control.end(),
+                        ...if_.end(),
                     ];
 				}
 				default:
@@ -490,28 +590,52 @@ const compileExpression = (
 					if (expr.argument.type === "NumberLiteral") {
 						return [
 							...f64.const(-expr.argument.value), // note the "-"
-							...fn.call(func.box_number),
+							...fn.call(func().box_number),
 						];
 					}
 					return [
 						...compileExpression(expr.argument, strings),
-						...fn.call(func.unbox_number),
+						...fn.call(func().unbox_number),
 						...f64.neg(),
-						...fn.call(func.box_number),
+						...fn.call(func().box_number),
 					];
 				}
 				case "~":
 					return [
 						...compileExpression(expr.argument, strings),
-						...fn.call(func.unbox_number),
+						...fn.call(func().unbox_number),
 						...f64.const(0),
 						...f64.eq(), // result is i32 here
-						...fn.call(func.box_bool),
+						...fn.call(func().box_bool),
 					];
 				default:
 					throw new Error(`Unsupported unary operator: ${expr.operator}`);
 			}
+		case "FunctionCallExpression": {
+			const { name, args } = expr;
+			const f = userDefinedFunctions.find((fn) => fn.name === name.name);
+			if (!f) {
+				throw new CompilerError(
+					`Function "${name.name}" is not defined`,
+					name.loc.start.line,
+					name.loc.start.column,
+					name.name.length,
+				);
+			}
+			if (f.type.params.length !== args.length) {
+				throw new CompilerError(
+					`Function "${name.name}" expects ${f.type.params.length} arguments, but got ${args.length}`,
+					name.loc.start.line,
+					name.loc.start.column,
+					name.name.length,
+				);
+			}
+			return [
+				...args.flatMap((arg) => compileExpression(arg, strings)),
+				...fn.call(func()[name.name]),
+			];
+		}
 		default:
-			throw new Error(`Unsupported expression type: ${expr.type}`);
+			throw new Error("Something went wrong");
 	}
 };
