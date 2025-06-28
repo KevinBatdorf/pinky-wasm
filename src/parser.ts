@@ -269,7 +269,7 @@ const parseStatement = (state: ParserState): Statement => {
 				{
 					type: "ForStatement" as const,
 					assignment: {
-						type: "AssignStatement" as const,
+						type: "LocalAssignStatement" as const,
 						identifier,
 						expression: start,
 						loc: {

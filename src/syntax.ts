@@ -121,7 +121,7 @@ export type WhileStatement = Node & {
 /** <for_stmt> ::= "for" <assign> "," <expr> ( "," <expr>)? "do" <stmts> "end" */
 export type ForStatement = Node & {
 	type: "ForStatement";
-	assignment: AssignStatement;
+	assignment: LocalAssignStatement;
 	condition: Expression;
 	increment?: Expression;
 	body: Statement[];

@@ -88,18 +88,17 @@ export const CodeEditor = (props: CodeEditorProps) => {
 	if (!highlighter) return null;
 
 	return (
-		<div ref={textAreaRef} className="overflow-y-auto h-full">
+		<div ref={textAreaRef} className="overflow-y-auto h-full font-mono">
 			<Editor
 				autoFocus
 				value={value}
-				className="font-mono"
 				onValueChange={onChange}
 				onClick={() => onChange(value)}
 				onKeyDown={() => onChange(value)}
 				{...remainingProps}
 				padding={16}
 				style={{
-					fontFamily: "var(--font-mono)",
+					lineHeight: "inherit",
 					backgroundColor: "#000",
 					overflowY: "auto",
 					paddingBottom: "10rem",

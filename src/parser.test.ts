@@ -805,7 +805,7 @@ end`;
 		{
 			type: "ForStatement",
 			assignment: {
-				type: "AssignStatement",
+				type: "LocalAssignStatement",
 				identifier: {
 					type: "Identifier",
 					name: "i",
@@ -864,7 +864,7 @@ end`;
 		{
 			type: "ForStatement",
 			assignment: {
-				type: "AssignStatement",
+				type: "LocalAssignStatement",
 				identifier: {
 					type: "Identifier",
 					name: "i",

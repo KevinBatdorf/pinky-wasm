@@ -10,7 +10,7 @@ import type { ParseErrorType } from "./parser";
 import type { Program, Location } from "./syntax";
 import { compile, type CompilerErrorType } from "./compiler";
 import { ByteCode } from "./components/ByteCode";
-import { loadWasm, type RunFunction } from "./wasm";
+import { loadWasm, type RunFunction } from "./compiler/exports";
 
 console.log("Hey there! 👋 Welcome to the Pinky WASM demo app!");
 

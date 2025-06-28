@@ -10,7 +10,9 @@
 @theme {
 	--font-mono: "JetBrainsMono", monospace;
 }
-
+.line {
+	@apply inline-flex;
+}
 textarea:focus-visible,
 input:focus-visible {
 	@apply outline-none;
