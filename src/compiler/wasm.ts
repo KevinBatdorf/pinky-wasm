@@ -110,6 +110,12 @@ export const local = {
 export const global = {
 	get: (index: number): number[] => [0x23, ...unsignedLEB(index)],
 	set: (index: number): number[] => [0x24, ...unsignedLEB(index)],
+	setFromOffset: (offset: number, index = 0): number[] => [
+		...global.get(index), // get global[index] (heap pointer)
+		...i32.const(offset), // offset to add
+		...i32.add(), // heap_ptr + offset
+		...global.set(index), // set global[index] = heap_ptr + offset
+	],
 };
 export const i32 = {
 	const: (value: number): number[] => [0x41, ...signedLEB(value)],
@@ -122,6 +128,8 @@ export const i32 = {
 	add: (): number[] => [0x6a],
 	sub: (): number[] => [0x6b],
 	mul: (): number[] => [0x6c],
+	shl: (): number[] => [0x74], // shift left
+	shr_u: (): number[] => [0x76], // unsigned shift right
 	trunc_f64_s: (): number[] => [0xaa], // convert f64 to i32 (signed)
 	load: (offset = 0): number[] => [0x28, 0x02, ...unsignedLEB(offset)],
 	store: (offset = 0): number[] => [0x36, 0x02, ...unsignedLEB(offset)],
@@ -169,11 +177,13 @@ export const fn = {
 	end: (): number[] => control.end(),
 };
 export const memory = {
-	size: (index = 0) => [0x3f, index],
-	grow: (index = 0) => [0x40, index],
+	size: () => [0x3f, 0x00],
+	grow: () => [0x40, 0x00],
 };
 export const misc = {
 	drop: (): number[] => [0x1a],
+	unreachable: (): number[] => [0x00],
+	nop: (): number[] => [0x01],
 };
 
 export const nativeBinOps = {
@@ -286,10 +296,7 @@ export const boxNumberFunctionBody = [
 	...f64.store(0), // offset = 0
 
 	// heap_ptr += 16
-	...global.get(0),
-	...i32.const(16),
-	...i32.add(),
-	...global.set(0),
+	...global.setFromOffset(16),
 
 	// return temp_ptr
 	...local.get(1),
@@ -334,10 +341,7 @@ export const boxStringFunctionBody = [
 	...i32.store(0), // offset = 0
 
 	// heap_ptr += 16
-	...global.get(0),
-	...i32.const(16),
-	...i32.add(),
-	...global.set(0),
+	...global.setFromOffset(16),
 
 	// return temp_ptr
 	...local.get(2),
@@ -365,15 +369,24 @@ export const boxBooleanFunctionBody = [
 	...i32.store(0), // offset = 0
 
 	// heap_ptr += 16
-	...global.get(0),
-	...i32.const(16),
-	...i32.add(),
-	...global.set(0),
+	...global.setFromOffset(16),
 
 	// return temp_ptr
 	...local.get(1),
 	...fn.end(),
 ];
+
+export const boxNilFunctionBody = [
+	// no incoming params
+	...local.declare(),
+	...global.get(0),
+	...i32.const(0), // nil tag
+	...i32.store(),
+	...global.setFromOffset(16), // increment heap pointer
+	...global.get(0),
+	...fn.end(),
+];
+
 // biome-ignore format:
 export const isTruthyFunctionBody: number[] = [
     // incoming param: a pointer to a boxed value

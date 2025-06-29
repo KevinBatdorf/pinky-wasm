@@ -184,7 +184,6 @@ export const CodeEditor = (props: CodeEditorProps) => {
 					overflowY: "auto",
 					paddingBottom: "10rem",
 					width: "100%",
-					height: "100%",
 				}}
 				highlight={(code: string) =>
 					highlighter

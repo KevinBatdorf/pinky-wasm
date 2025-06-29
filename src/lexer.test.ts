@@ -101,6 +101,13 @@ test("advance", () => {
 	expect(position).toEqual({ line: 2, column: 2, current: 7 });
 });
 
+test("handles escaped characters in string", () => {
+	const input = `print "\\n\\t\\"end\\""`;
+	const { tokens } = tokenize(input);
+	const str = tokens.find((t) => t.type === "STRING")?.value;
+	expect(str).toBe('\n\t"end"');
+});
+
 test("should tokenize all punctuation and symbol tokens", () => {
 	const input = "(),+-*/^%";
 	const { tokens } = tokenize(input);

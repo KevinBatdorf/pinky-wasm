@@ -48,6 +48,15 @@ export const advance = (
 		current: curr + 1,
 	};
 };
+const ESCAPE_SEQUENCES: Record<string, string> = {
+	n: "\n",
+	t: "\t",
+	r: "\r",
+	'"': '"',
+	"'": "'",
+	"\\": "\\",
+	"0": "\0",
+};
 
 export const tokenize = (
 	src: string,
@@ -110,8 +119,17 @@ export const tokenize = (
 					!match(src, pos.current, ch)
 				) {
 					// consume to the end of the line
-					value += peek(src, pos.current);
-					pos = advance(src, pos.current, pos.line, pos.column);
+					const char = peek(src, pos.current);
+					if (char === "\\") {
+						const next = peek(src, pos.current + 1);
+						value += ESCAPE_SEQUENCES[next] ?? next;
+						// consume both characters: \ and the next one
+						pos = advance(src, pos.current, pos.line, pos.column); // \
+						pos = advance(src, pos.current, pos.line, pos.column); // next
+					} else {
+						value += char;
+						pos = advance(src, pos.current, pos.line, pos.column);
+					}
 				}
 				if (isEndOfFile(peek(src, pos.current))) {
 					addToken({ type: "EOF", value: "" });

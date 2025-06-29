@@ -17,7 +17,6 @@ export const getCurrentScope = (): Scope => {
 	}
 	return currentScope;
 };
-
 const findScopeForVar = (name: string): Scope => {
 	// walk up scopes from the last looking for the variable
 	for (let i = 1; i < scopes.length + 1; i++) {
@@ -26,12 +25,6 @@ const findScopeForVar = (name: string): Scope => {
 	}
 	return getCurrentScope(); // fallsback to the last scope
 };
-
-let nextLocalVarsIndex = 0; // for local variables and function parameters
-export const setLocalVarsIndex = (index: number) => {
-	nextLocalVarsIndex = index;
-};
-export const getLocalVarsIndex = (): number => nextLocalVarsIndex;
 export const declareVar = (name: string, isLocal: boolean): VarInfo | null => {
 	if (isLocal && scopes.at(-1)?.has(name)) {
 		// Cant do local x := 1 twice in the same scope
@@ -51,24 +44,32 @@ export const declareVar = (name: string, isLocal: boolean): VarInfo | null => {
 };
 export const getVar = (name: string): VarInfo | undefined =>
 	findScopeForVar(name)?.get(name);
-// For temporary variables, we use a special index
-let scratchIndex: number | null = null;
-export const setScratchIndex = (v: number | null) => {
+
+// for local variables and function parameters
+let nextLocalVarsIndex = 0;
+export const setLocalVarsIndex = (index: number) => {
+	nextLocalVarsIndex = index;
+};
+export const getLocalVarsIndex = (): number => nextLocalVarsIndex;
+
+// For temporary variables, they can override
+let scratchIndex = 0;
+export const setScratchIndex = (v: number) => {
 	scratchIndex = v;
 };
-export const getScratchIndex = (): number => {
-	if (scratchIndex === null) scratchIndex = nextLocalVarsIndex++;
+export const consumeScratchIndex = (): number => {
+	if (scratchIndex === 0) scratchIndex = nextLocalVarsIndex++;
 	return scratchIndex;
 };
 
-export const getLocalDecls = () =>
-	nextLocalVarsIndex > 0
-		? [
-				...unsignedLEB(1), // 1 type group
-				...unsignedLEB(nextLocalVarsIndex), // N locals
-				valType("i32"), // all locals are boxed i32
-			]
-		: unsignedLEB(0); // no locals
+export const getLocalDecls = () => {
+	if (nextLocalVarsIndex === 0) return unsignedLEB(0);
+	return [
+		...unsignedLEB(1), // 1 type group
+		...unsignedLEB(nextLocalVarsIndex), // N locals
+		valType("i32"), // all locals are boxed i32
+	];
+};
 
 // Create a string table to manage string offsets in the WASM binary
 export const createStringTable = () => {

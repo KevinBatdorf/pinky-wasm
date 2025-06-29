@@ -1,6 +1,7 @@
 import type { Statement } from "../syntax";
 import {
 	boxBooleanFunctionBody,
+	boxNilFunctionBody,
 	boxNumberFunctionBody,
 	boxStringFunctionBody,
 	isTruthyFunctionBody,
@@ -34,6 +35,7 @@ export const definedFunctions: FunctionType[] = [
 	{ name: "box_bool", type: { params: [i32], results: [i32] } },
 	{ name: "box_string", type: { params: [i32, i32], results: [i32] } },
 	{ name: "is_truthy", type: { params: [i32], results: [i32] } },
+	{ name: "box_nil", type: { params: [], results: [i32] } },
 ] as const;
 export const userDefinedFunctions: FunctionType[] = [];
 export const addUserDefinedFunction = (
@@ -58,6 +60,7 @@ const builtInFuncBodies: Record<string, number[]> = {
 	box_bool: boxBooleanFunctionBody,
 	box_string: boxStringFunctionBody,
 	is_truthy: isTruthyFunctionBody,
+	box_nil: boxNilFunctionBody,
 };
 export let functionBodies = { ...builtInFuncBodies };
 export const addFunctionBody = (name: string, body: number[]): void => {
@@ -86,28 +89,21 @@ export const getFunctionTypes = (): {
 	];
 	for (const imp of allFunctions) {
 		const key = getFunctionTypeKey(imp.type);
-		if (functionIndices.has(key)) {
-			const typeIndex = functionIndices.get(key);
-			if (!typeIndex) {
-				throw new Error(
-					`Function type "${key}" not found in functionIndices map`,
-				);
-			}
-			functionTypes.push(functionTypes[typeIndex]);
-			continue;
+		if (!functionIndices.has(key)) {
+			const typeIndex = functionTypes.length;
+			functionIndices.set(key, typeIndex);
+			functionTypes.push([
+				0x60,
+				...unsignedLEB(imp.type.params.length),
+				...imp.type.params,
+				...unsignedLEB(imp.type.results.length),
+				...imp.type.results,
+			]);
 		}
-		const typeIndex = functionTypes.length;
-		functionIndices.set(key, typeIndex);
-		functionTypes.push([
-			0x60,
-			...unsignedLEB(imp.type.params.length),
-			...imp.type.params,
-			...unsignedLEB(imp.type.results.length),
-			...imp.type.results,
-		]);
 	}
 	return { functionTypes, functionIndices };
 };
+
 // Assign the function indices to be used in the WebAssembly module
 export const func = (): Record<string, number> => {
 	const list: Record<string, number> = {};
@@ -119,22 +115,13 @@ export const func = (): Record<string, number> => {
 	return list;
 };
 
-export const hasReturn = (body: Statement[]): boolean => {
-	for (const stmt of body) {
-		if (stmt.type === "FunctionDeclStatement") continue;
-		if (stmt.type === "ReturnStatement") return true;
-		if (stmt.type === "IfStatement") {
-			if (
-				hasReturn(stmt.thenBranch) ||
-				(stmt.elseBranch && hasReturn(stmt.elseBranch)) ||
-				stmt.elifBranches?.some((b) => hasReturn(b.body))
-			) {
-				return true;
-			}
-		}
-		if (stmt.type === "WhileStatement" || stmt.type === "ForStatement") {
-			if (hasReturn(stmt.body)) return true;
-		}
-	}
-	return false;
+export const getFunctionReturnCount = (name: string): number => {
+	const all = [
+		...definedFunctions,
+		...importFunctions,
+		...userDefinedFunctions,
+	];
+	const fn = all.find((f) => f.name === name);
+	if (!fn) throw new Error(`Function "${name}" not found`);
+	return fn.type.results.length;
 };

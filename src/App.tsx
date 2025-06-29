@@ -170,7 +170,7 @@ function App() {
             sm:grid-cols-2
             md:grid-cols-[1fr_13.55rem_13.55rem]
             lg:grid-cols-[13.55rem_1fr_13.55rem_13.55rem]
-            xl:grid-cols-[13.55rem_1fr_0.5fr_13.55rem_13.55rem]
+            xl:grid-cols-[13.55rem_1fr_0.8fr_13.55rem_13.55rem]
 
             grid-rows-5
             sm:grid-rows-3

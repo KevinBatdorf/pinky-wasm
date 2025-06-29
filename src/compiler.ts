@@ -5,9 +5,9 @@ import {
 	definedFunctions,
 	func,
 	functionBodies,
+	getFunctionReturnCount,
 	getFunctionTypeKey,
 	getFunctionTypes,
-	hasReturn,
 	importFunctions,
 	resetFunctionBodies,
 	userDefinedFunctions,
@@ -21,7 +21,7 @@ import {
 	exitScope,
 	getLocalDecls,
 	getLocalVarsIndex,
-	getScratchIndex,
+	consumeScratchIndex,
 	getVar,
 	setLocalVarsIndex,
 	setScratchIndex,
@@ -41,8 +41,9 @@ import {
 	block,
 	loop,
 	if_,
+	misc,
 } from "./compiler/wasm";
-
+console.log(func());
 class CompilerError extends Error {
 	line: number;
 	column: number;
@@ -96,7 +97,7 @@ const _compile = (
 	// Reset state for each compilation
 	clearScopes();
 	setLocalVarsIndex(0);
-	setScratchIndex(null);
+	setScratchIndex(0);
 	clearUserDefinedFunctions();
 	resetFunctionBodies();
 
@@ -109,7 +110,6 @@ const _compile = (
 	const mainFunc = mainFuncBody(ast, strings); // compiles
 	addFunctionBody("main", mainFunc);
 	const { functionTypes, functionIndices } = getFunctionTypes();
-	console.log("Function types:", functionTypes, functionIndices, func());
 	const funcSection = emitSection(
 		3,
 		new Uint8Array([
@@ -258,7 +258,6 @@ export const mainFuncBody = (
 	strings: ReturnType<typeof createStringTable>,
 ): number[] => {
 	const instructions: number[] = compileStatements(ast.body, strings);
-
 	// Since we are boxing, there's only one type of local variable (i32)
 	return [...getLocalDecls(), ...instructions, ...control.end()];
 };
@@ -345,10 +344,10 @@ const compileStatement = (
 		}
 		case "WhileStatement": {
 			enterScope();
-			const condition = compileExpression(stmt.condition, strings);
 			enterScope();
 			const body = compileStatements(stmt.body, strings);
 			exitScope();
+			const condition = compileExpression(stmt.condition, strings);
 			exitScope();
 			// biome-ignore format:
 			return [
@@ -385,7 +384,7 @@ const compileStatement = (
 			const loopBody = compileStatements(body, strings);
 			exitScope(); // exit inner
 			exitScope();
-			const isDescending = getScratchIndex();
+			const isDescending = consumeScratchIndex();
 			// biome-ignore format:
 			return [
                 ...init, // e.g. i := 0
@@ -440,16 +439,22 @@ const compileStatement = (
 				);
 			}
 			const paramTypes = params.map(() => valType("i32")); // boxed i32
-			const returnType = hasReturn(body) ? [valType("i32")] : [];
-			addUserDefinedFunction(name.name, paramTypes, returnType);
+			// const returnType = [];
+			addUserDefinedFunction(name.name, paramTypes, [valType("i32")]);
 			const prevIndex = getLocalVarsIndex();
 			setLocalVarsIndex(0); // temp set to collect fn params
+			setScratchIndex(0);
 			enterScope();
 			for (const param of params) declareVar(param.name, true);
-			const bodyBytes = compileStatements(body, strings);
+			const bodyBytes = [
+				...compileStatements(body, strings),
+				...fn.call(func().box_nil),
+				...fn.return(),
+			];
 			exitScope();
 			const localDecls = getLocalDecls();
 			setLocalVarsIndex(prevIndex); // restore local vars index
+			setScratchIndex(prevIndex); // restore scratch index
 			addFunctionBody(name.name, [
 				...localDecls,
 				...bodyBytes,
@@ -458,13 +463,17 @@ const compileStatement = (
 			return [];
 		}
 		case "ReturnStatement": {
-			return [
-				...compileExpression(stmt.expression, strings),
-				...fn.call(func().ret),
-			];
+			return [...compileExpression(stmt.expression, strings), ...fn.return()];
 		}
 		case "ExpressionStatement": {
-			return compileExpression(stmt.expression, strings);
+			// check if the expression is a function call
+			// and whether it returns a value
+			if (stmt.expression.type === "FunctionCallExpression") {
+				const code = compileExpression(stmt.expression, strings);
+				const returns = getFunctionReturnCount(stmt.expression.name.name);
+				return returns > 0 ? [...code, ...misc.drop()] : code;
+			}
+			return [...compileExpression(stmt.expression, strings), ...misc.drop()];
 		}
 		default:
 			throw new Error("Something went wrong");
@@ -549,7 +558,7 @@ const compileExpression = (
 						...fn.call(func().box_number),
 					];
 				case "and": {
-					const scratch = getScratchIndex();
+					const scratch = consumeScratchIndex();
 					// biome-ignore format:
 					return [
                         ...left, // evaluate A
@@ -564,7 +573,7 @@ const compileExpression = (
                     ];
 				}
 				case "or": {
-					const scratch = getScratchIndex();
+					const scratch = consumeScratchIndex();
 					// biome-ignore format:
 					return [
                         ...left, // evaluate A

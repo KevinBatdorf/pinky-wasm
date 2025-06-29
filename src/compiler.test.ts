@@ -3,7 +3,6 @@ import { compile } from "./compiler";
 import { tokenize } from "./lexer";
 import { parse } from "./parser";
 import { loadWasm, type RunFunction } from "./compiler/exports";
-// import fs from "node:fs";
 
 declare global {
 	var run: RunFunction;
@@ -14,17 +13,13 @@ beforeAll(async () => {
 	globalThis.run = run;
 });
 
+// import fs from "node:fs";
 // test.only("prints to wasm binary file", async () => {
-// 	const input = `x := 1
-
-// func foo(a, b)
-//   c := a + b
-//   println c
+// 	const input = `func foo()
 //   ret true
 // end
 
-// foo(1,2)
-
+// foo()
 // `;
 // 	const { tokens } = tokenize(input);
 // 	const { ast } = parse(tokens);
@@ -795,4 +790,258 @@ test("for loop step as a variable", () => {
 	const output = run(bytes);
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("54321");
+});
+
+test("function call with no return", () => {
+	const input = `
+        func greet()
+          println "hi"
+        end
+        greet()`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("hi\n");
+});
+
+test("function returns value but unused", () => {
+	const input = `
+        func give()
+          ret 1
+        end
+        give()
+        println "ok"`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("ok\n");
+});
+
+test("function return used in assignment", () => {
+	const input = `
+        func getNum()
+          ret 42
+        end
+        x := getNum()
+        println x`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("42\n");
+});
+
+test("function with parameters returns sum", () => {
+	const input = `
+        func add(a, b)
+          ret a + b
+        end
+        println add(5, 7)`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("12\n");
+});
+
+test("nested function calls work", () => {
+	const input = `
+        func square(n)
+          ret n * n
+        end
+        func doubleSquare(x)
+          ret square(x * 2)
+        end
+        println doubleSquare(3)`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("36\n");
+});
+
+test("conditional returns based on input", () => {
+	const input = `
+        func check(a)
+          if a > 0 then
+            ret "positive"
+          else
+            ret "non-positive"
+          end
+        end
+        println check(3)`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("positive\n");
+});
+
+test("return from within a while loop", () => {
+	const input = `
+        func earlyExit()
+          i := 0
+          while i < 5 do
+            if i == 3 then
+              ret i
+            end
+            i := i + 1
+          end
+          ret -1
+        end
+        println earlyExit()`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("3\n");
+});
+
+test("missing return in one branch returns nil", () => {
+	const input = `
+        func nil(flag)
+          if flag then
+            ret 1
+          end
+        end
+        println nil(false)`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("\n");
+});
+
+test("missing return in one branch is falsy", () => {
+	const input = `
+        func nil(flag)
+            if flag then ret 1 end
+        end
+        if nil(false) then
+            println 1
+        else
+            print 3
+        end`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("3");
+});
+
+test("multiple returns in same block doesn't error", () => {
+	const input = `
+        func foo()
+            ret 1
+            ret 2
+        end
+        print foo()`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	expect(error).toBeNull();
+	const output = run(bytes);
+	expect(output.join("")).toBe("1");
+});
+
+test("return inside loop and after loop", () => {
+	const input = `
+        func logic(x)
+            while x > 0 do
+                if x == 2 then
+                    ret "two"
+                end
+                x := x - 1
+            end
+            ret "done"
+        end
+        println logic(3)`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("two\n");
+});
+
+test("recursive function call", () => {
+	const input = `
+        func fact(n)
+            if n <= 1 then
+                ret 1
+            else
+                ret n * fact(n - 1)
+            end
+        end
+        println fact(5)`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("120\n");
+});
+
+test("Can handle printing nil values", () => {
+	const input = `
+        func log(msg)
+          println msg
+        end
+        print log("hello")`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("hello\n");
+});
+
+// misc cases where it error
+test("handles binary and inside while condition", () => {
+	// This was an issue with scratch var tracking in the compiler
+	const input = `
+        func foo()
+            while 1 <= 4 and 1 < 3 do
+                x := 1
+            end
+        end
+        println true and false`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	expect(error).toBeNull();
+	const output = run(bytes);
+	expect(output.join("")).toBe("false\n");
+});
+
+test("clears out scratch var index before fn decl", () => {
+	// This was also scratch index related
+	const input = `
+        i := 2
+        for i := 1, 3 do
+            print i
+        end
+        print i
+        func foo(n)
+            if 1 and 2 then
+                ret 1
+            end
+        end`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	expect(error).toBeNull();
+	const output = run(bytes);
+	expect(output.join("")).toBe("1232");
 });
