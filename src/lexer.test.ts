@@ -1,6 +1,7 @@
 import { test, expect } from "vitest";
 import {
 	advance,
+	decodeStringLiteralSegment,
 	isAlpha,
 	isAlphaNumeric,
 	isDigit,
@@ -100,12 +101,51 @@ test("advance", () => {
 	position = advance(source, 6, position.line, position.column);
 	expect(position).toEqual({ line: 2, column: 2, current: 7 });
 });
-
+test("decodes simple escape \\n", () => {
+	const src = "\\n";
+	const result = decodeStringLiteralSegment(src, { current: 0 });
+	expect(result).toEqual({ char: "\n", advance: 2 });
+});
+test("decodes simple escape \\\\", () => {
+	const src = "\\\\";
+	const result = decodeStringLiteralSegment(src, { current: 0 });
+	expect(result).toEqual({ char: "\\", advance: 2 });
+});
+test("decodes unicode escape \\u0041", () => {
+	const src = "\\u0041"; // 'A'
+	const result = decodeStringLiteralSegment(src, { current: 0 });
+	expect(result).toEqual({ char: "A", advance: 6 });
+});
+test("malformed \\u escapes fallback", () => {
+	const src = "\\u12Z4"; // invalid hex
+	const result = decodeStringLiteralSegment(src, { current: 0 });
+	expect(result).toEqual({ char: "\\u", advance: 2 });
+});
+test("decodes unicode codepoint escape \\u{1F600}", () => {
+	const src = "\\u{1F600}"; // 😀
+	const result = decodeStringLiteralSegment(src, { current: 0 });
+	expect(result).toEqual({ char: "😀", advance: 9 });
+});
+test("handles incomplete \\u{ escape", () => {
+	const src = "\\u{1F60"; // missing closing brace
+	const result = decodeStringLiteralSegment(src, { current: 0 });
+	expect(result).toEqual({ char: "\\u{1F60}", advance: 7 });
+});
+test("handles invalid hex in \\u{ escape", () => {
+	const src = "\\u{XYZ}";
+	const result = decodeStringLiteralSegment(src, { current: 0 });
+	expect(result).toEqual({ char: "\\u{}", advance: 3 });
+});
 test("handles escaped characters in string", () => {
 	const input = `print "\\n\\t\\"end\\""`;
 	const { tokens } = tokenize(input);
 	const str = tokens.find((t) => t.type === "STRING")?.value;
 	expect(str).toBe('\n\t"end"');
+});
+test("unknown escape character falls back to raw", () => {
+	const src = "\\z";
+	const result = decodeStringLiteralSegment(src, { current: 0 });
+	expect(result).toEqual({ char: "z", advance: 2 });
 });
 
 test("should tokenize all punctuation and symbol tokens", () => {

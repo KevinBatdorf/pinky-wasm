@@ -1,4 +1,3 @@
-import type { Statement } from "../syntax";
 import {
 	boxBooleanFunctionBody,
 	boxNilFunctionBody,

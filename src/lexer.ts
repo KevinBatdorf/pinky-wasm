@@ -57,6 +57,50 @@ const ESCAPE_SEQUENCES: Record<string, string> = {
 	"\\": "\\",
 	"0": "\0",
 };
+export const decodeStringLiteralSegment = (
+	src: string,
+	pos: { current: number },
+): { char: string; advance: number } => {
+	const start = pos.current;
+	const ch = src[start + 1];
+	if (ch === "u") {
+		if (src[start + 2] === "{") {
+			// Unicode escape \u{XXXXXX}
+			let i = start + 3;
+			let hex = "";
+			while (i < src.length && src[i] !== "}") {
+				if (!/[0-9a-fA-F]/.test(src[i])) break;
+				hex += src[i++];
+			}
+			if (src[i] === "}") {
+				const codePoint = Number.parseInt(hex, 16);
+				if (!Number.isNaN(codePoint)) {
+					return {
+						char: String.fromCodePoint(codePoint),
+						advance: i - start + 1,
+					};
+				}
+			}
+			// Malformed unicode: fallback to raw
+			return { char: `\\u{${hex}}`, advance: i - start };
+		}
+		// Unicode escape \uXXXX
+		const hex = src.slice(start + 2, start + 6);
+		if (/^[0-9a-fA-F]{4}$/.test(hex)) {
+			const codePoint = Number.parseInt(hex, 16);
+			return {
+				char: String.fromCharCode(codePoint),
+				advance: 6,
+			};
+		}
+		return { char: "\\u", advance: 2 };
+	}
+	// Simple escape: \n, \t, etc.
+	return {
+		char: ESCAPE_SEQUENCES[ch] ?? ch,
+		advance: 2,
+	};
+};
 
 export const tokenize = (
 	src: string,
@@ -121,11 +165,15 @@ export const tokenize = (
 					// consume to the end of the line
 					const char = peek(src, pos.current);
 					if (char === "\\") {
-						const next = peek(src, pos.current + 1);
-						value += ESCAPE_SEQUENCES[next] ?? next;
-						// consume both characters: \ and the next one
-						pos = advance(src, pos.current, pos.line, pos.column); // \
-						pos = advance(src, pos.current, pos.line, pos.column); // next
+						// checks for escape sequences
+						const { char: decoded, advance: adv } = decodeStringLiteralSegment(
+							src,
+							{ current: pos.current },
+						);
+						value += decoded;
+						for (let i = 0; i < adv; i++) {
+							pos = advance(src, pos.current, pos.line, pos.column);
+						}
 					} else {
 						value += char;
 						pos = advance(src, pos.current, pos.line, pos.column);
