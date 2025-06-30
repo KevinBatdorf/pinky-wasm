@@ -1,15 +1,7 @@
 # Pinky lexer, parser, and wasm code generator
 
-I'm building this to apply what I'm learning of writing lexers, parsers, and code generators. I'll expand on this project over time.
+I built this to apply what I'm learning of writing lexers, parsers, and code generators. Pinky is a simple scripting language that is designed for learning more about compilers and interpreters. It has a very simple syntax and is designed to be easy to understand. Read more about it at [https://pinky-lang.org/](https://pinky-lang.org/).
 
 Demo here [http://pinky.cool.omg.lol](http://pinky.cool.omg.lol).
 
-If you want to learn more about this stuff, I highly recommend the [Compilers, Interpreters & Formal Languages](https://pikuma.com/courses/create-a-programming-language-compiler) course by [Pikuma](https://pikuma.com/). It's a beginner-friendly course that really goes into detail.
-
-TODO:
-- [ ] Add wasm code generation and render output
-- [ ] Add lexer error recovery to continue tokenizing
-- [ ] Add parser error recovery to continue parsing
-- [ ] Show more detailed error messages and editor highlights
-- [ ] Add a formatter to minimize/prettify the code
-- [ ] Create a linter to check for common mistakes
+If you want to learn more about this stuff, I highly recommend the [Compilers, Interpreters & Formal Languages](https://pikuma.com/courses/create-a-programming-language-compiler) course by [Pikuma](https://pikuma.com/). It's a beginner-friendly course that really goes into much more detail than you would expect.
