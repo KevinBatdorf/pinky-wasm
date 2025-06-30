@@ -43,15 +43,10 @@ function App() {
 
 	useEffect(() => {
 		// set mobile viewport height once
-		const setInitialVh = () => {
-			document.documentElement.style.setProperty(
-				"--app-vh",
-				`${window.innerHeight}px`,
-			);
-		};
-		setInitialVh();
-		window.addEventListener("resize", setInitialVh);
-		return () => window.removeEventListener("resize", setInitialVh);
+		document.documentElement.style.setProperty(
+			"--app-vh",
+			`${window.innerHeight}px`,
+		);
 	}, []);
 
 	const {
