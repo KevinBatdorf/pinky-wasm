@@ -10,14 +10,12 @@
 @theme {
 	--font-mono: "JetBrainsMono", monospace;
 }
-.line {
-	@apply inline-flex;
-}
 textarea:focus-visible,
 input:focus-visible {
 	@apply outline-none;
 }
 .hovered-token {
+	box-shadow: 0 0 0 2px #ff66c4 !important;
 	background: #ff66c4 !important;
 	color: black !important;
 	* {

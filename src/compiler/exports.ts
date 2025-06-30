@@ -41,22 +41,72 @@ export const loadWasm = async (): Promise<{ run: RunFunction }> => {
 			env.print(boxPtr);
 			output.push("\n");
 		},
+		// TODO: Probably a ton of work, but maybe eventually implement in wasm
+		to_string: (boxPtr: number) => {
+			const buf = new DataView(memory.buffer);
+			const tag = buf.getInt32(boxPtr, true);
+			switch (tag) {
+				case 0:
+					return boxString("", memory);
+				case 1:
+					return boxString(String(buf.getFloat64(boxPtr + 8, true)), memory);
+				case 2:
+					return boxPtr;
+				case 3:
+					return boxString(
+						buf.getInt32(boxPtr + 4, true) ? "true" : "false",
+						memory,
+					);
+				default:
+					return boxString("", memory);
+			}
+		},
+		// TODO: here too because something like `10 ^ 0.5` is hard
+		math_pow: (base: number, exp: number): number => {
+			return base ** exp;
+		},
 	};
 
-	const run = (bytes: Uint8Array): string[] => {
-		output.length = 0; // clear previous output
-		const program = new WebAssembly.Module(bytes);
-		const instance = new WebAssembly.Instance(program, {
-			env,
-		});
-		memory = instance.exports.memory as WebAssembly.Memory;
-		try {
-			(instance.exports.main as () => void)();
-		} catch (e) {
-			console.error("Runtime error:", e);
-			return [`RuntimeError: ${e instanceof Error ? e.message : String(e)}`];
-		}
-		return [...output];
+	return {
+		run: (bytes: Uint8Array): string[] => {
+			output.length = 0; // clear previous output
+			const program = new WebAssembly.Module(bytes);
+			const instance = new WebAssembly.Instance(program, {
+				env,
+			});
+			memory = instance.exports.memory as WebAssembly.Memory;
+			try {
+				(instance.exports.main as () => void)();
+			} catch (e) {
+				console.error("Runtime error:", e);
+				let msg = e instanceof Error ? e.message : String(e);
+				if (msg === "unreachable") {
+					msg = "Unreachable code found. Infinite loop?";
+				}
+				return [`RuntimeError: ${msg}`];
+			}
+			return [...output];
+		},
 	};
-	return { run };
+};
+
+const boxString = (str: string, memory: WebAssembly.Memory): number => {
+	const encoder = new TextEncoder();
+	const bytes = encoder.encode(str);
+
+	memory.grow(1);
+	const buf = new DataView(memory.buffer);
+	const mem = new Uint8Array(memory.buffer);
+	const offset = memory.buffer.byteLength - bytes.length;
+
+	for (let i = 0; i < bytes.length; i++) {
+		mem[offset + i] = bytes[i];
+	}
+
+	const boxPtr = offset - 12;
+	buf.setInt32(boxPtr, 2, true); // tag = string
+	buf.setInt32(boxPtr + 4, offset, true); // offset
+	buf.setInt32(boxPtr + 8, bytes.length, true); // length
+
+	return boxPtr;
 };

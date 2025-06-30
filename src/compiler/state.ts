@@ -10,6 +10,10 @@ export const clearScopes = () => {
 	scopes.length = 0; // clear all scopes
 	scopes.push(new Map()); // reinitialize with global scope
 };
+export const setScopes = (newScopes: Scope[]) => {
+	scopes.length = 0; // clear current scopes
+	scopes.push(...newScopes); // set new scopes
+};
 export const getCurrentScope = (): Scope => {
 	const currentScope = scopes.at(-1);
 	if (!currentScope) {
@@ -53,14 +57,7 @@ export const setLocalVarsIndex = (index: number) => {
 export const getLocalVarsIndex = (): number => nextLocalVarsIndex;
 
 // For temporary variables, they can override
-let scratchIndex = 0;
-export const setScratchIndex = (v: number) => {
-	scratchIndex = v;
-};
-export const consumeScratchIndex = (): number => {
-	if (scratchIndex === 0) scratchIndex = nextLocalVarsIndex++;
-	return scratchIndex;
-};
+export const consumeScratchIndex = (): number => nextLocalVarsIndex++;
 
 export const getLocalDecls = () => {
 	if (nextLocalVarsIndex === 0) return unsignedLEB(0);

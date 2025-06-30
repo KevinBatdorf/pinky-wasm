@@ -3,7 +3,6 @@ import { compile } from "./compiler";
 import { tokenize } from "./lexer";
 import { parse } from "./parser";
 import { loadWasm, type RunFunction } from "./compiler/exports";
-
 declare global {
 	var run: RunFunction;
 }
@@ -12,21 +11,6 @@ beforeAll(async () => {
 	const { run } = await loadWasm();
 	globalThis.run = run;
 });
-
-// import fs from "node:fs";
-// test.only("prints to wasm binary file", async () => {
-// 	const input = `func foo()
-//   ret true
-// end
-
-// foo()
-// `;
-// 	const { tokens } = tokenize(input);
-// 	const { ast } = parse(tokens);
-// 	const { bytes, error } = compile(ast);
-// 	fs.writeFileSync("test.wasm", bytes);
-// 	expect(error).toBeNull();
-// });
 
 test("println hello world", async () => {
 	const input = 'println "hello world"';
@@ -147,6 +131,7 @@ test("prints modulus operators", async () => {
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("31-21-200NaN");
 });
+
 test("prints exponentiation operators", async () => {
 	const input = `
         print 2 ^ 3 -- 8
@@ -368,6 +353,23 @@ test("if statements with local variables", async () => {
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("2");
 });
+
+test("shadowed variable restored after block", () => {
+	const input = `
+        x := "outer"
+        if true then
+            local x := "inner"
+            println x
+        end
+        println x`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	expect(error).toBeNull();
+	const output = run(bytes);
+	expect(output.join("")).toBe("inner\nouter\n");
+});
+
 test("if without else and false condition", () => {
 	const input = `
         x := 2
@@ -381,6 +383,7 @@ test("if without else and false condition", () => {
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("");
 });
+
 test("elif skipped due to true if branch", () => {
 	const input = `
         x := 1
@@ -396,6 +399,7 @@ test("elif skipped due to true if branch", () => {
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("first");
 });
+
 test("all branches skipped with no else", () => {
 	const input = `
         x := 0
@@ -413,6 +417,7 @@ test("all branches skipped with no else", () => {
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("");
 });
+
 test("local variable inside else branch", () => {
 	const input = `
         x := 2
@@ -429,6 +434,7 @@ test("local variable inside else branch", () => {
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("10");
 });
+
 test("complex if condition", () => {
 	const input = `
         x := 2
@@ -509,6 +515,7 @@ test("while loop with local variables scoped", async () => {
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("2222");
 });
+
 test("while loop with false condition from start", async () => {
 	const input = `
         x := 5
@@ -523,6 +530,7 @@ test("while loop with false condition from start", async () => {
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("");
 });
+
 test("while loop with local gives runtime error", async () => {
 	const input = `
         x := 1
@@ -537,9 +545,10 @@ test("while loop with local gives runtime error", async () => {
 	const output = run(bytes);
 	expect(error).toBeNull();
 	expect(output.join("")).toContain(
-		"RuntimeError: memory access out of bounds",
+		"RuntimeError: Unreachable code found. Infinite loop?",
 	);
 });
+
 test("while loop modifies outer variable", async () => {
 	const input = `
         x := 1
@@ -554,6 +563,7 @@ test("while loop modifies outer variable", async () => {
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("4");
 });
+
 test("while loop modifies outer variable", async () => {
 	const input = `
         x := 1
@@ -572,6 +582,7 @@ test("while loop modifies outer variable", async () => {
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("22214");
 });
+
 test("nested while loops", async () => {
 	const input = `
         i := 1
@@ -654,7 +665,9 @@ test("for loop with zero step runs forever", () => {
 	const { bytes, error } = compile(ast);
 	const output = run(bytes);
 	expect(error).toBeNull();
-	expect(output.join("")).toBe("RuntimeError: memory access out of bounds");
+	expect(output.join("")).toBe(
+		"RuntimeError: Unreachable code found. Infinite loop?",
+	);
 });
 
 test("for loop where start > end without step has no output", () => {
@@ -726,6 +739,7 @@ test("for loop with negative step but start < end does not run", () => {
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("");
 });
+
 test("for loop with zero step causes runtime error", () => {
 	const input = `
         for i := 1, 5, 0 do
@@ -738,6 +752,7 @@ test("for loop with zero step causes runtime error", () => {
 	expect(error).toBeNull();
 	expect(output.join("")).toContain("RuntimeError");
 });
+
 test("shadowing loop variable in nested loop", () => {
 	const input = `
         for i := 1, 2 do
@@ -752,6 +767,7 @@ test("shadowing loop variable in nested loop", () => {
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("10111011");
 });
+
 test("outer variable retains value after loop", () => {
 	const input = `
         i := 2
@@ -766,6 +782,7 @@ test("outer variable retains value after loop", () => {
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("1232");
 });
+
 test("for loop with start equal to end runs once", () => {
 	const input = `
         for i := 3, 3 do
@@ -778,6 +795,7 @@ test("for loop with start equal to end runs once", () => {
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("3");
 });
+
 test("for loop step as a variable", () => {
 	const input = `
         step := -1
@@ -804,6 +822,23 @@ test("function call with no return", () => {
 	const output = run(bytes);
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("hi\n");
+});
+
+test("passing function return to another function", () => {
+	const input = `
+        func one()
+          ret 1
+        end
+        func addTwo(x)
+          ret x + 2
+        end
+        println addTwo(one())`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	expect(error).toBeNull();
+	const output = run(bytes);
+	expect(output.join("")).toBe("3\n");
 });
 
 test("function returns value but unused", () => {
@@ -834,6 +869,22 @@ test("function return used in assignment", () => {
 	const output = run(bytes);
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("42\n");
+});
+
+test("function params do not modify outer scope", () => {
+	const input = `
+        x := 10
+        func modify(x)
+            x := 5
+        end
+        modify(99)
+        println x`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	expect(error).toBeNull();
+	const output = run(bytes);
+	expect(output.join("")).toBe("10\n");
 });
 
 test("function with parameters returns sum", () => {
@@ -992,6 +1043,124 @@ test("recursive function call", () => {
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("120\n");
 });
+test("string concat: string + string", () => {
+	const input = `
+        println "Hello, " + "world!"`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("Hello, world!\n");
+});
+
+test("string concat: string + number", () => {
+	const input = `
+        println "Age: " + 42`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("Age: 42\n");
+});
+
+test("string concat: number + string", () => {
+	const input = `
+        println 100 + "%"`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("100%\n");
+});
+
+test("string concat: string + bool", () => {
+	const input = `
+        println "Done: " + true`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("Done: true\n");
+});
+
+test("string concat: nested expression", () => {
+	const input = `
+        println "Result: " + (1 + 2) + ", ok"`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("Result: 3, ok\n");
+});
+
+test("string concat: function return + string", () => {
+	const input = `
+        func greet()
+            ret "Hello"
+        end
+        println greet() + " world!"`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("Hello world!\n");
+});
+
+test("string concat: variable + string", () => {
+	const input = `
+        x := "Score: "
+        y := 99
+        println x + y`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("Score: 99\n");
+});
+
+test("string concat: var + func return + literal", () => {
+	const input = `
+        func tag()
+            ret "[OK]"
+        end
+        msg := "Result "
+        println msg + tag() + "!"`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("Result [OK]!\n");
+});
+
+test("string concat: empty string", () => {
+	const input = `
+        println "" + "empty" + ""`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("empty\n");
+});
+
+test("string concat with number and boolean", () => {
+	const input = `
+        println "Result: " + 10 + " " + true`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	const output = run(bytes);
+	expect(error).toBeNull();
+	expect(output.join("")).toBe("Result: 10 true\n");
+});
 
 test("Can handle printing nil values", () => {
 	const input = `
@@ -1005,6 +1174,19 @@ test("Can handle printing nil values", () => {
 	const output = run(bytes);
 	expect(error).toBeNull();
 	expect(output.join("")).toBe("hello\n");
+});
+
+test("empty function returns nil", () => {
+	const input = `
+        func noop()
+        end
+        println noop()`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	expect(error).toBeNull();
+	const output = run(bytes);
+	expect(output.join("")).toBe("\n");
 });
 
 // misc cases where it error
@@ -1044,4 +1226,40 @@ test("clears out scratch var index before fn decl", () => {
 	expect(error).toBeNull();
 	const output = run(bytes);
 	expect(output.join("")).toBe("1232");
+});
+
+test("Function variables are scoped to the function", () => {
+	// Before it was attempting to shadow the outside scope
+	const input = `
+        i := 0
+        func foo(n)
+            i := 1
+            while i <= n do
+                print "bar"
+                i := i + 1
+            end
+        end
+        foo(5)`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	expect(error).toBeNull();
+	const output = run(bytes);
+	expect(output.join("")).toBe("barbarbarbarbar");
+});
+
+test("boolean coerces to number in math", () => {
+	const input = `
+        print 1 + true
+        print 1 + false
+        print true + true
+        print false + false
+        print true + 1
+        print false + 1`;
+	const { tokens } = tokenize(input);
+	const { ast } = parse(tokens);
+	const { bytes, error } = compile(ast);
+	expect(error).toBeNull();
+	const output = run(bytes);
+	expect(output.join("")).toBe("212021");
 });

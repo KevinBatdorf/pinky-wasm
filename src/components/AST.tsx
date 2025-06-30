@@ -43,10 +43,12 @@ export const ASTComponent = ({
 	);
 };
 const colorsByDepth = [
-	"text-violet-400",
-	"text-violet-300",
-	"text-violet-200",
-	"text-violet-100",
+	"text-sky-600",
+	"text-sky-500",
+	"text-sky-400",
+	"text-sky-300",
+	"text-sky-400",
+	"text-sky-500",
 ];
 const getColor = (depth: number) => {
 	return colorsByDepth[depth % colorsByDepth.length];
@@ -55,11 +57,13 @@ const getColor = (depth: number) => {
 const StatementDisplay = ({
 	statement,
 	indent = 0,
+	depth = 0,
 	handleHover,
 	handleLeave,
 }: {
 	statement: Statement;
 	indent?: number;
+	depth?: number;
 	handleHover: (loc: Location) => void;
 	handleLeave: () => void;
 }) => {
@@ -76,13 +80,14 @@ const StatementDisplay = ({
 							handleHover(statement.loc);
 						}}
 						onMouseLeave={handleLeave}
-						className={getColor(indent)}
+						className={getColor(depth)}
 					>
 						{statement.type}
 					</div>
 					<ExpressionDisplay
 						expression={statement.expression}
 						indent={indent + 1}
+						depth={depth + 1}
 						handleHover={handleHover}
 						handleLeave={handleLeave}
 					/>
@@ -92,7 +97,7 @@ const StatementDisplay = ({
 			return (
 				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
-						className={getColor(indent)}
+						className={getColor(depth)}
 						onMouseEnter={(e) => {
 							e.stopPropagation();
 							handleHover(statement.loc);
@@ -105,12 +110,14 @@ const StatementDisplay = ({
 						<ExpressionDisplay
 							expression={statement.identifier}
 							indent={indent + 1}
+							depth={depth + 1}
 							handleHover={handleHover}
 							handleLeave={handleLeave}
 						/>
 						<ExpressionDisplay
 							expression={statement.expression}
 							indent={indent + 1}
+							depth={depth + 1}
 							handleHover={handleHover}
 							handleLeave={handleLeave}
 						/>
@@ -121,7 +128,7 @@ const StatementDisplay = ({
 			return (
 				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
-						className={getColor(indent)}
+						className={getColor(depth)}
 						onMouseEnter={(e) => {
 							e.stopPropagation();
 							handleHover(statement.loc);
@@ -131,14 +138,15 @@ const StatementDisplay = ({
 						{statement.type}
 					</div>
 					<div style={{ marginLeft: `${(indent + 1) * 8}px` }}>
-						<div className={getColor(indent)}>Condition:</div>
+						<div className={getColor(depth)}>Condition:</div>
 						<ExpressionDisplay
 							expression={statement.condition}
 							indent={indent + 1}
+							depth={depth + 1}
 							handleHover={handleHover}
 							handleLeave={handleLeave}
 						/>
-						<div className={getColor(indent)}>Then:</div>
+						<div className={getColor(depth)}>Then:</div>
 						{statement.thenBranch.map((stmt, index) => (
 							<StatementDisplay
 								handleHover={handleHover}
@@ -146,16 +154,18 @@ const StatementDisplay = ({
 								key={index + randomId}
 								statement={stmt}
 								indent={indent}
+								depth={depth + 1}
 							/>
 						))}
 						{statement?.elifBranches && (
 							<>
-								<div className={getColor(indent)}>Elif Condition:</div>
+								<div className={getColor(depth)}>Elif Condition:</div>
 								{statement.elifBranches.map((elif, index) => (
 									<div key={index + randomId}>
 										<ExpressionDisplay
 											expression={elif.condition}
 											indent={indent + 1}
+											depth={depth + 1}
 											handleHover={handleHover}
 											handleLeave={handleLeave}
 										/>
@@ -165,6 +175,7 @@ const StatementDisplay = ({
 												key={index + randomId}
 												statement={stmt}
 												indent={indent}
+												depth={depth + 1}
 												handleHover={handleHover}
 												handleLeave={handleLeave}
 											/>
@@ -175,12 +186,13 @@ const StatementDisplay = ({
 						)}
 						{statement.elseBranch ? (
 							<>
-								<div className={getColor(indent)}>Else:</div>
+								<div className={getColor(depth)}>Else:</div>
 								{statement.elseBranch.map((stmt, index) => (
 									<StatementDisplay
 										key={index + randomId}
 										statement={stmt}
 										indent={indent}
+										depth={depth + 1}
 										handleHover={handleHover}
 										handleLeave={handleLeave}
 									/>
@@ -194,7 +206,7 @@ const StatementDisplay = ({
 			return (
 				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
-						className={getColor(indent)}
+						className={getColor(depth)}
 						onMouseEnter={(e) => {
 							e.stopPropagation();
 							handleHover(statement.loc);
@@ -204,19 +216,21 @@ const StatementDisplay = ({
 						{statement.type}
 					</div>
 					<div style={{ marginLeft: `${(indent + 1) * 8}px` }}>
-						<div className={getColor(indent)}>Condition:</div>
+						<div className={getColor(depth)}>Condition:</div>
 						<ExpressionDisplay
 							expression={statement.condition}
 							indent={indent + 1}
+							depth={depth + 1}
 							handleHover={handleHover}
 							handleLeave={handleLeave}
 						/>
-						<div className={getColor(indent)}>Do:</div>
+						<div className={getColor(depth)}>Do:</div>
 						{statement.body.map((stmt, index) => (
 							<StatementDisplay
 								key={index + randomId}
 								statement={stmt}
 								indent={indent}
+								depth={depth + 1}
 								handleHover={handleHover}
 								handleLeave={handleLeave}
 							/>
@@ -228,7 +242,7 @@ const StatementDisplay = ({
 			return (
 				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
-						className={getColor(indent)}
+						className={getColor(depth)}
 						onMouseEnter={(e) => {
 							e.stopPropagation();
 							handleHover(statement.loc);
@@ -241,33 +255,37 @@ const StatementDisplay = ({
 						<StatementDisplay
 							statement={statement.assignment}
 							indent={indent}
+							depth={depth + 1}
 							handleHover={handleHover}
 							handleLeave={handleLeave}
 						/>
-						<div className={getColor(indent)}>To:</div>
+						<div className={getColor(depth)}>To:</div>
 						<ExpressionDisplay
 							expression={statement.condition}
 							indent={indent + 1}
+							depth={depth + 1}
 							handleHover={handleHover}
 							handleLeave={handleLeave}
 						/>
 						{statement.increment ? (
 							<>
-								<div className={getColor(indent)}>Step:</div>
+								<div className={getColor(depth)}>Step:</div>
 								<ExpressionDisplay
 									expression={statement.increment}
 									indent={indent + 1}
+									depth={depth + 1}
 									handleHover={handleHover}
 									handleLeave={handleLeave}
 								/>
 							</>
 						) : null}
-						<div className={getColor(indent)}>Do:</div>
+						<div className={getColor(depth)}>Do:</div>
 						{statement.body.map((stmt, index) => (
 							<StatementDisplay
 								key={index + randomId}
 								statement={stmt}
 								indent={indent}
+								depth={depth + 1}
 								handleHover={handleHover}
 								handleLeave={handleLeave}
 							/>
@@ -279,7 +297,7 @@ const StatementDisplay = ({
 			return (
 				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
-						className={getColor(indent)}
+						className={getColor(depth)}
 						onMouseEnter={(e) => {
 							e.stopPropagation();
 							handleHover(statement.loc);
@@ -289,33 +307,36 @@ const StatementDisplay = ({
 						{statement.type}
 					</div>
 					<div style={{ marginLeft: `${(indent + 1) * 8}px` }}>
-						<div className={getColor(indent)}>Name:</div>
+						<div className={getColor(depth)}>Name:</div>
 						<ExpressionDisplay
 							expression={statement.name}
 							indent={indent + 1}
+							depth={depth + 1}
 							handleHover={handleHover}
 							handleLeave={handleLeave}
 						/>
 						{statement.params.length ? (
 							<>
-								<div className={getColor(indent)}>Params:</div>
+								<div className={getColor(depth)}>Params:</div>
 								{statement.params.map((param, index) => (
 									<ExpressionDisplay
 										key={index + randomId}
 										expression={param}
 										indent={indent + 1}
+										depth={depth + 1}
 										handleHover={handleHover}
 										handleLeave={handleLeave}
 									/>
 								))}
 							</>
 						) : null}
-						<div className={getColor(indent)}>Body:</div>
+						<div className={getColor(depth)}>Body:</div>
 						{statement.body.map((stmt, index) => (
 							<StatementDisplay
 								key={index + randomId}
 								statement={stmt}
 								indent={indent}
+								depth={depth + 1}
 								handleHover={handleHover}
 								handleLeave={handleLeave}
 							/>
@@ -327,7 +348,7 @@ const StatementDisplay = ({
 			return (
 				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
-						className={getColor(indent)}
+						className={getColor(depth)}
 						onMouseEnter={(e) => {
 							e.stopPropagation();
 							handleHover(statement.loc);
@@ -339,6 +360,7 @@ const StatementDisplay = ({
 					<ExpressionDisplay
 						expression={statement.expression}
 						indent={indent + 1}
+						depth={depth + 1}
 						handleHover={handleHover}
 						handleLeave={handleLeave}
 					/>
@@ -348,7 +370,7 @@ const StatementDisplay = ({
 			return (
 				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
-						className={getColor(indent)}
+						className={getColor(depth)}
 						onMouseEnter={(e) => {
 							e.stopPropagation();
 							handleHover(statement.loc);
@@ -361,12 +383,14 @@ const StatementDisplay = ({
 						<ExpressionDisplay
 							expression={statement.identifier}
 							indent={indent + 1}
+							depth={depth + 1}
 							handleHover={handleHover}
 							handleLeave={handleLeave}
 						/>
 						<ExpressionDisplay
 							expression={statement.expression}
 							indent={indent + 1}
+							depth={depth + 1}
 							handleHover={handleHover}
 							handleLeave={handleLeave}
 						/>
@@ -379,11 +403,13 @@ const StatementDisplay = ({
 const ExpressionDisplay = ({
 	expression,
 	indent,
+	depth,
 	handleHover,
 	handleLeave,
 }: {
 	expression: Expression;
 	indent: number;
+	depth: number;
 	handleHover: (loc: Location) => void;
 	handleLeave: () => void;
 }) => {
@@ -396,8 +422,9 @@ const ExpressionDisplay = ({
 					onMouseEnter={() => handleHover(expression.loc)}
 					onMouseLeave={handleLeave}
 				>
-					<div className={getColor(indent)}>
-						<span className="font-sans">└</span> {expression.type}
+					<div className={getColor(depth)}>
+						<span className="font-sans mr-1">└</span>
+						{expression.type}
 					</div>
 					<div
 						style={{ marginLeft: `${indent * 8}px` }}
@@ -414,8 +441,9 @@ const ExpressionDisplay = ({
 					onMouseEnter={() => handleHover(expression.loc)}
 					onMouseLeave={handleLeave}
 				>
-					<div className={getColor(indent)}>
-						<span className="font-sans">└</span> {expression.type}
+					<div className={getColor(depth)}>
+						<span className="font-sans mr-1">└</span>
+						{expression.type}
 					</div>
 					<div
 						style={{ marginLeft: `${indent * 8}px` }}
@@ -432,8 +460,9 @@ const ExpressionDisplay = ({
 					onMouseEnter={() => handleHover(expression.loc)}
 					onMouseLeave={handleLeave}
 				>
-					<div className={getColor(indent)}>
-						<span className="font-sans">└</span> {expression.type}
+					<div className={getColor(depth)}>
+						<span className="font-sans mr-1">└</span>
+						{expression.type}
 					</div>
 					<div
 						style={{ marginLeft: `${indent * 8}px` }}
@@ -448,15 +477,17 @@ const ExpressionDisplay = ({
 				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div>
 						<div
-							className={getColor(indent)}
+							className={getColor(depth)}
 							onMouseEnter={() => handleHover(expression.loc)}
 							onMouseLeave={handleLeave}
 						>
-							<span className="font-sans">└</span> {expression.type}
+							<span className="font-sans mr-1">└</span>
+							{expression.type}
 						</div>
 						<ExpressionDisplay
 							expression={expression.name}
 							indent={indent}
+							depth={depth + 1}
 							handleHover={handleHover}
 							handleLeave={handleLeave}
 						/>
@@ -467,6 +498,7 @@ const ExpressionDisplay = ({
 								key={index + randomId}
 								expression={arg}
 								indent={indent}
+								depth={depth + 1}
 								handleHover={handleHover}
 								handleLeave={handleLeave}
 							/>
@@ -479,15 +511,17 @@ const ExpressionDisplay = ({
 				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div>
 						<div
-							className={getColor(indent)}
+							className={getColor(depth)}
 							onMouseEnter={() => handleHover(expression.loc)}
 							onMouseLeave={handleLeave}
 						>
-							<span className="font-sans">└</span> {expression.type}
+							<span className="font-sans mr-1">└</span>
+							{expression.type}
 						</div>
 						<ExpressionDisplay
 							expression={expression.left}
 							indent={indent}
+							depth={depth + 1}
 							handleHover={handleHover}
 							handleLeave={handleLeave}
 						/>
@@ -500,6 +534,7 @@ const ExpressionDisplay = ({
 						<ExpressionDisplay
 							expression={expression.right}
 							indent={indent}
+							depth={depth + 1}
 							handleHover={handleHover}
 							handleLeave={handleLeave}
 						/>
@@ -510,11 +545,12 @@ const ExpressionDisplay = ({
 			return (
 				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
-						className={getColor(indent)}
+						className={getColor(depth)}
 						onMouseEnter={() => handleHover(expression.loc)}
 						onMouseLeave={handleLeave}
 					>
-						<span className="font-sans">└</span> {expression.type}
+						<span className="font-sans mr-1">└</span>
+						{expression.type}
 					</div>
 					<div
 						style={{ marginLeft: `${indent * 8}px` }}
@@ -525,6 +561,7 @@ const ExpressionDisplay = ({
 					<ExpressionDisplay
 						expression={expression.argument}
 						indent={indent}
+						depth={depth + 1}
 						handleHover={handleHover}
 						handleLeave={handleLeave}
 					/>
@@ -537,8 +574,9 @@ const ExpressionDisplay = ({
 					onMouseEnter={() => handleHover(expression.loc)}
 					onMouseLeave={handleLeave}
 				>
-					<div className={getColor(indent)}>
-						<span className="font-sans">└</span> {expression.type}
+					<div className={getColor(depth)}>
+						<span className="font-sans mr-1">└</span>
+						{expression.type}
 					</div>
 					<div
 						style={{ marginLeft: `${indent * 8}px` }}
@@ -552,15 +590,17 @@ const ExpressionDisplay = ({
 			return (
 				<div style={{ marginLeft: `${indent * 8}px` }}>
 					<div
-						className={getColor(indent)}
+						className={getColor(depth)}
 						onMouseEnter={() => handleHover(expression.loc)}
 						onMouseLeave={handleLeave}
 					>
-						<span className="font-sans">└</span> {expression.type}
+						<span className="font-sans mr-1">└</span>
+						{expression.type}
 					</div>
 					<ExpressionDisplay
 						expression={expression.expression}
 						indent={indent}
+						depth={depth + 1}
 						handleHover={handleHover}
 						handleLeave={handleLeave}
 					/>

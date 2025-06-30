@@ -121,18 +121,23 @@ export const i32 = {
 	const: (value: number): number[] => [0x41, ...signedLEB(value)],
 	eq: (): number[] => [0x46],
 	eqz: (): number[] => [0x45], // equal zero
-	gt_u: (): number[] => [0x4c], // unsigned greater than
+	gt_u: (): number[] => [0x4b], // unsigned greater than
 	ge_s: (): number[] => [0x4e], // signed greater than or equal
+	ge_u: (): number[] => [0x4f], // unsigned greater than or equal
 	ne: (): number[] => [0x47],
 	lt_s: (): number[] => [0x48], // signed less than
 	add: (): number[] => [0x6a],
 	sub: (): number[] => [0x6b],
 	mul: (): number[] => [0x6c],
+	and: (): number[] => [0x71], // bitwise AND
+	or: (): number[] => [0x72], // bitwise OR
 	shl: (): number[] => [0x74], // shift left
 	shr_u: (): number[] => [0x76], // unsigned shift right
 	trunc_f64_s: (): number[] => [0xaa], // convert f64 to i32 (signed)
 	load: (offset = 0): number[] => [0x28, 0x02, ...unsignedLEB(offset)],
 	store: (offset = 0): number[] => [0x36, 0x02, ...unsignedLEB(offset)],
+	load8_u: (offset = 0): number[] => [0x2d, 0x00, ...unsignedLEB(offset)],
+	store8: (offset = 0): number[] => [0x3a, 0x00, ...unsignedLEB(offset)],
 };
 
 export const f64 = {
@@ -146,6 +151,7 @@ export const f64 = {
 	add: (): number[] => [0xa0],
 	sub: (): number[] => [0xa1],
 	mul: (): number[] => [0xa2],
+	convert_i32_u: (): number[] => [0xb8],
 	convert_i32_s: (): number[] => [0xb7],
 	div: (): number[] => [0xa3],
 	neg: (): number[] => [0x9a],
@@ -203,225 +209,3 @@ export const nativeBinOps = {
 	and: null,
 	or: null,
 } as const;
-
-// biome-ignore format:
-// js/lua style modulus
-export const modFunctionBody = [
-	...local.declare(), // no locals
-	...local.get(0),    // 0 (left)
-	...local.get(1),    // 1 (right)
-	...local.get(0),    // 0 (left)
-	...local.get(1),    // 1 (right)
-	...f64.div(),
-	...f64.trunc(), // trunc to integer
-	...f64.mul(),   // multiply by right
-	...f64.sub(),   // subtract -> yields a - b * floor(a/b)
-	...fn.end(),
-];
-
-// biome-ignore format:
-export const powFunctionBody = [
-    // incoming params: base (f64), exp (f64)
-    ...local.declare("f64", "i32", "i32"), // result, exp_i32, counter
-	// If exp < 0, invert base and negate exp
-	...local.get(1), // the exp
-	...f64.const(0),
-	...f64.lt(),
-	...if_.start(), // if (exp < 0)
-		...f64.const(1),
-		...local.get(0), // the base
-		...f64.div(),
-		...local.set(0), // base = 1 / base
-		...local.get(1), // the exp
-		...f64.neg(),
-		...local.set(1), // exp = -exp
-	...if_.end(),
-
-	// result = base
-	...local.get(0), // the base
-	...local.set(2), // local.set 2
-
-	// exp_i32 = trunc(exp)
-	...local.get(1), // the exp
-	...i32.trunc_f64_s(), // convert f64 to i32
-	...local.set(3),
-
-	// counter = 1
-	...i32.const(1),
-	...local.set(4),
-
-	...block.start(),
-		...loop.start(),
-			...local.get(4), // counter
-			...local.get(3), // the exp_i32
-			...i32.ge_s(),
-			...loop.br_if(1), // break outer
-
-			...local.get(2), // result
-			...local.get(0), // base
-			...f64.mul(), // result *= base
-			...local.set(2), // result *= base
-
-			...local.get(4), // counter
-			...i32.const(1),
-			...i32.add(), // counter++
-			...local.set(4),
-
-			...loop.br(0), // repeat loop
-		...loop.end(),
-	...block.end(),
-
-	...local.get(2), // result
-	...fn.end(),
-];
-
-export const boxNumberFunctionBody = [
-	// incoming param: f64 value
-	...local.declare("i32"), // temp_ptr
-
-	// temp_ptr = heap_ptr
-	...global.get(0),
-	...local.set(1), // local[1] = temp_ptr
-
-	// store tag = 1 (number) at temp_ptr
-	...local.get(1),
-	...i32.const(1),
-	...i32.store(0), // offset = 0
-
-	// store f64 at temp_ptr + 8
-	...local.get(1),
-	...i32.const(8),
-	...i32.add(),
-	...local.get(0), // f64 param
-	...f64.store(0), // offset = 0
-
-	// heap_ptr += 16
-	...global.setFromOffset(16),
-
-	// return temp_ptr
-	...local.get(1),
-	...fn.end(),
-];
-
-export const unboxNumberFunctionBody = [
-	// incoming param: pointer to boxed number
-	...local.declare(),
-	...local.get(0), // pointer to boxed number
-	...i32.const(8),
-	...i32.add(),
-	...f64.load(0), // align = 8, offset = 0
-	...fn.end(),
-];
-
-export const boxStringFunctionBody = [
-	// two incoming params: string offset (i32) and length (i32)
-	...local.declare("i32"), // declare temp_ptr
-
-	// temp_ptr = heap_ptr
-	...global.get(0),
-	...local.set(2), // temp_ptr
-
-	// store tag = 2 at (temp_ptr)
-	...local.get(2),
-	...i32.const(2),
-	...i32.store(0), // offset = 0
-
-	// store offset param at (temp_ptr + 4)
-	...local.get(2),
-	...i32.const(4),
-	...i32.add(),
-	...local.get(0),
-	...i32.store(0), // offset = 0
-
-	// store length param at (temp_ptr + 8)
-	...local.get(2),
-	...i32.const(8),
-	...i32.add(),
-	...local.get(1),
-	...i32.store(0), // offset = 0
-
-	// heap_ptr += 16
-	...global.setFromOffset(16),
-
-	// return temp_ptr
-	...local.get(2),
-	...fn.end(),
-];
-
-export const boxBooleanFunctionBody = [
-	// incoming param: boolean value (i32)
-	...local.declare("i32"), // temp_ptr
-
-	// temp_ptr = heap_ptr
-	...global.get(0),
-	...local.set(1),
-
-	// store tag = 3 (boolean)
-	...local.get(1),
-	...i32.const(3),
-	...i32.store(0), // offset = 0
-
-	// store boolean value at temp_ptr + 4
-	...local.get(1),
-	...i32.const(4),
-	...i32.add(),
-	...local.get(0),
-	...i32.store(0), // offset = 0
-
-	// heap_ptr += 16
-	...global.setFromOffset(16),
-
-	// return temp_ptr
-	...local.get(1),
-	...fn.end(),
-];
-
-export const boxNilFunctionBody = [
-	// no incoming params
-	...local.declare(),
-	...global.get(0),
-	...i32.const(0), // nil tag
-	...i32.store(),
-	...global.setFromOffset(16), // increment heap pointer
-	...global.get(0),
-	...fn.end(),
-];
-
-// biome-ignore format:
-export const isTruthyFunctionBody: number[] = [
-    // incoming param: a pointer to a boxed value
-    ...local.declare(), // no locals
-    // load tag
-    ...local.get(0),
-    ...i32.load(0),
-
-    // if tag == 1 (number)
-    ...i32.const(1), ...i32.eq(),
-    ...if_.start(valType("i32")), // if (result i32)
-        ...local.get(0), ...i32.const(8), ...i32.add(), // offset + 8
-        ...f64.load(0),
-        ...f64.const(0),
-        ...f64.ne(), // (number != 0)
-        ...if_.else(),
-            ...local.get(0), ...i32.load(0), // load tag again
-            // if tag == 3 (bool)
-            ...i32.const(3), ...i32.eq(),
-                ...if_.start(valType("i32")), // if (result i32)
-                ...local.get(0), ...i32.const(4), ...i32.add(), // offset + 4
-                ...i32.load(0),
-            ...if_.else(),
-                ...local.get(0), ...i32.load(0), // load tag again
-                ...i32.const(2), ...i32.eq(),
-                ...if_.start(valType("i32")), // if (result i32)
-                    ...local.get(0), ...i32.const(8), ...i32.add(),
-                    ...i32.load(0),
-                    ...i32.const(0),
-                    ...i32.ne(), // (length > 0)
-                ...if_.else(),
-                    // falsy fallback
-                    ...i32.const(0), // return 0 (falsy)
-                ...if_.end(), // end string
-            ...if_.end(), // end bool
-        ...if_.end(), // end number
-    ...fn.end(),
-];

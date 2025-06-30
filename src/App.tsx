@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Token } from "./tokens";
 import { CodeEditor } from "./components/Editor";
 import example from "./example.pinky";
@@ -19,6 +19,7 @@ function App() {
 	const [run, setRun] = useState<RunFunction | null>(null);
 	const [hovered, setHoveredToken] = useState<Location | null>(null);
 	const isMouseDown = useRef(false);
+	const hoverTimeout = useRef<number | null>(null);
 
 	useEffect(() => {
 		const handleDown = () => {
@@ -51,7 +52,7 @@ function App() {
 	}>(() => {
 		const now = performance.now();
 		const { tokens, error } = tokenize(code);
-		// console.log({ tokens, error });
+		console.log({ tokens, error });
 		return { tokens, perf: performance.now() - now, error };
 	}, [code]);
 
@@ -66,7 +67,7 @@ function App() {
 	}>(() => {
 		const now = performance.now();
 		const { ast, error } = parse(tokens);
-		// console.log({ ast, error });
+		console.log({ ast, error });
 		return { ast, perf: performance.now() - now, error };
 	}, [tokens]);
 
@@ -86,7 +87,7 @@ function App() {
 		}
 		const now = performance.now();
 		const { bytes, meta, error } = compile(ast);
-		// console.log({ bytes, meta, error });
+		console.log({ bytes, meta, error });
 
 		return {
 			bytes,
@@ -107,6 +108,9 @@ function App() {
 	}>(() => {
 		if (
 			!run ||
+			astError ||
+			compilerError ||
+			tokenError ||
 			typeof bytes?.[Symbol.iterator] !== "function" ||
 			!bytes.length
 		) {
@@ -123,9 +127,9 @@ function App() {
 				error: String(err),
 			};
 		}
-	}, [bytes, run]);
+	}, [bytes, run, astError, compilerError, tokenError]);
 
-	const handleHover = (loc: Location) => {
+	const handleHover = useCallback((loc: Location) => {
 		// If text is selected or they are selecting, don't bother
 		if (isMouseDown.current) return;
 		const selection = window.getSelection();
@@ -149,10 +153,24 @@ function App() {
 			}
 			return prev;
 		});
-	};
-	const handleLeave = () => {
+	}, []);
+	const handleLeave = useCallback(() => {
 		setHoveredToken(null);
-	};
+	}, []);
+
+	// Prevent flyover mouse events from triggering hover
+	const debouncedHandleHover = useCallback(
+		(loc: Location) => {
+			if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+			hoverTimeout.current = window.setTimeout(() => handleHover(loc), 100);
+		},
+		[handleHover],
+	);
+
+	const debouncedHandleLeave = useCallback(() => {
+		if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+		handleLeave();
+	}, [handleLeave]);
 	const handleOnChange = (value: string) => {
 		setHoveredToken(null);
 		setCode(value);
@@ -238,8 +256,8 @@ function App() {
 							<TokensComponent
 								tokens={tokens}
 								error={tokenError}
-								handleHover={handleHover}
-								handleLeave={handleLeave}
+								handleHover={debouncedHandleHover}
+								handleLeave={debouncedHandleLeave}
 							/>
 						</pre>
 					</div>
@@ -262,20 +280,28 @@ function App() {
 						</div>
 						<pre className="overflow-x-hidden overflow-y-auto">
 							{outputError ? (
-								<div className="text-wrap text-red-500">{outputError}</div>
+								<>
+									<div className="text-wrap text-red-500 wrap-break-word">
+										{outputError}
+									</div>
+									<FileIssueLink output={outputError.split("\n")} code={code} />
+								</>
 							) : (
-								<div className="pb-60 whitespace-pre-wrap text-gray-100 break-all">
+								<div className="pb-60 whitespace-pre-wrap text-gray-100 wrap-break-word relative">
 									{output
 										?.join("")
-										.split("\n")
-										.map((line, i) => (
+										?.split("\n")
+										?.map((line, i) => (
 											<div
 												key={`${i}-${line}`}
-												className="before:content-['~>'] before:mr-1.5 before:text-gray-500"
+												className="before:content-['~>'] before:text-gray-500 before:absolute before:-left-2 before:w-6 before:text-right ml-6"
 											>
-												{line}
+												{line === "" ? "\u00A0" : line}
 											</div>
 										))}
+									{output?.join("")?.includes("RuntimeError") ? (
+										<FileIssueLink output={output} code={code} />
+									) : null}
 								</div>
 							)}
 						</pre>
@@ -302,8 +328,8 @@ function App() {
 								<ASTComponent
 									ast={ast}
 									error={astError}
-									handleHover={handleHover}
-									handleLeave={handleLeave}
+									handleHover={debouncedHandleHover}
+									handleLeave={debouncedHandleLeave}
 								/>
 							)}
 						</div>
@@ -338,3 +364,37 @@ function App() {
 }
 
 export default App;
+
+const FileIssueLink = ({
+	output,
+	code,
+}: {
+	output: string[];
+	code: string;
+}) => (
+	<div className="mt-4 text-wrap text-stone-400">
+		Did you find a bug? Press{" "}
+		<a
+			target="_blank"
+			rel="noopener noreferrer"
+			className="text-stone-100 hover:text-stone-300 underline"
+			href={`https://github.com/KevinBatdorf/pinky-wasm/issues/new?title=RuntimeError%20encountered&body=${encodeURIComponent(
+				[
+					"### Error message:",
+					output.join("\n"),
+					"",
+					"### Code:",
+					"```pinky",
+					code,
+					"```",
+					"",
+					"### Environment:",
+					`Browser: ${navigator.userAgent}`,
+				].join("\n"),
+			)}`}
+		>
+			here
+		</a>{" "}
+		to report it.
+	</div>
+);

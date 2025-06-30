@@ -23,4 +23,5 @@ dist-ssr
 *.sln
 *.sw?
 
-test.wasm
+debug.wasm
+debug.wat

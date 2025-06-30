@@ -47,7 +47,7 @@ export const TokensComponent = ({
 						className="w-full text-left grid grid-cols-2 gap-2 cursor-default"
 					>
 						<span className="flex-shrink-0 text-green-500">{type}</span>
-						<span className="text-clip text-blue-200">{value}</span>
+						<span className="text-clip text-blue-200">{value.trim()}</span>
 					</div>
 				);
 			})}

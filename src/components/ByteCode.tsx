@@ -13,7 +13,7 @@ export const ByteCode = ({
 	return (
 		<div className="flex-grow pb-60">
 			{strings?.length ? (
-				<div className="bg-gray-900 p-1 text-xs rounded mb-1 text-gray-400 whitespace-normal break-all">
+				<div className="bg-stone-900 p-1 text-xs rounded mb-1 text-gray-400 whitespace-normal wrap-break-word">
 					{new TextDecoder().decode(strings)}
 				</div>
 			) : null}
@@ -22,8 +22,7 @@ export const ByteCode = ({
 					<span
 						// biome-ignore lint:
 						key={i}
-						className="px-1 py-0.5 rounded bg-gray-800 text-green-300"
-						title={`Byte ${i}`}
+						className="px-1 py-0.5 rounded bg-gray-800 text-lime-600"
 					>
 						{byte.toString(16).padStart(2, "0")}
 					</span>

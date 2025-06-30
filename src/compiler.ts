@@ -24,7 +24,8 @@ import {
 	consumeScratchIndex,
 	getVar,
 	setLocalVarsIndex,
-	setScratchIndex,
+	scopes,
+	setScopes,
 } from "./compiler/state";
 import type { Expression, Statement } from "./syntax";
 import {
@@ -43,7 +44,6 @@ import {
 	if_,
 	misc,
 } from "./compiler/wasm";
-console.log(func());
 class CompilerError extends Error {
 	line: number;
 	column: number;
@@ -62,6 +62,8 @@ class CompilerError extends Error {
 	}
 }
 export type CompilerErrorType = null | CompilerError;
+
+const MAX_ITERATIONS = 10_000; // prevent infinite loops
 
 export const compile = (
 	ast: AST,
@@ -97,7 +99,6 @@ const _compile = (
 	// Reset state for each compilation
 	clearScopes();
 	setLocalVarsIndex(0);
-	setScratchIndex(0);
 	clearUserDefinedFunctions();
 	resetFunctionBodies();
 
@@ -173,7 +174,7 @@ const _compile = (
 		new Uint8Array([
 			0x01, // number of memories
 			0x00, // limits: min only
-			0x01, // min = 1 page = 64KB
+			0x10, // min = 1 page = 64KB
 		]),
 	);
 
@@ -349,14 +350,33 @@ const compileStatement = (
 			exitScope();
 			const condition = compileExpression(stmt.condition, strings);
 			exitScope();
+
+			const counterIndex = consumeScratchIndex();
+
 			// biome-ignore format:
 			return [
+                // Start counter at 0
+                ...i32.const(0),
+                ...local.set(counterIndex),
 				...block.start(),
                 ...loop.start(),
+                    // check if we reached max iterations
+                    ...local.get(counterIndex),
+                    ...i32.const(MAX_ITERATIONS),
+                    ...i32.ge_u(),
+                    ...if_.start(), // counter >= maxIters
+                        ...misc.unreachable(), // infinite loop, throw error
+                    ...if_.end(),
+                    ...local.get(counterIndex),
+                    ...i32.const(1),
+                    ...i32.add(), // increment counter
+                    ...local.set(counterIndex),
+
                     ...condition,
                     ...fn.call(func().is_truthy),
                     ...i32.eqz(), // check if condition is false
                     ...loop.br_if(1), // break out of outer block
+
                     ...body,
                     ...loop.br(0), // loop back
                 ...loop.end(),
@@ -385,8 +405,13 @@ const compileStatement = (
 			exitScope(); // exit inner
 			exitScope();
 			const isDescending = consumeScratchIndex();
+			const counterIndex = consumeScratchIndex();
 			// biome-ignore format:
 			return [
+                // Start counter at 0
+                ...i32.const(0),
+                ...local.set(counterIndex),
+
                 ...init, // e.g. i := 0
                 ...step,
                 ...fn.call(func().unbox_number),
@@ -396,6 +421,18 @@ const compileStatement = (
 
                 ...block.start(),
                 ...loop.start(),
+                    // check if we reached max iterations
+                    ...local.get(counterIndex),
+                    ...i32.const(MAX_ITERATIONS),
+                    ...i32.ge_u(),
+                    ...if_.start(), // counter >= maxIters
+                        ...misc.unreachable(), // infinite loop, throw error
+                    ...if_.end(),
+                    ...local.get(counterIndex),
+                    ...i32.const(1),
+                    ...i32.add(), // increment counter
+                    ...local.set(counterIndex),
+
                     ...local.get(isDescending),
                     ...if_.start(valType("i32")), // descending case
                         ...local.get(loopVar.index),
@@ -443,18 +480,18 @@ const compileStatement = (
 			addUserDefinedFunction(name.name, paramTypes, [valType("i32")]);
 			const prevIndex = getLocalVarsIndex();
 			setLocalVarsIndex(0); // temp set to collect fn params
-			setScratchIndex(0);
-			enterScope();
+			// cache scope for the function
+			const scopesTmp = [...scopes];
+			clearScopes();
 			for (const param of params) declareVar(param.name, true);
 			const bodyBytes = [
 				...compileStatements(body, strings),
 				...fn.call(func().box_nil),
 				...fn.return(),
 			];
-			exitScope();
 			const localDecls = getLocalDecls();
 			setLocalVarsIndex(prevIndex); // restore local vars index
-			setScratchIndex(prevIndex); // restore scratch index
+			setScopes(scopesTmp); // restore scopes
 			addFunctionBody(name.name, [
 				...localDecls,
 				...bodyBytes,
@@ -520,6 +557,46 @@ const compileExpression = (
 			const left = compileExpression(expr.left, strings);
 			const right = compileExpression(expr.right, strings);
 			const nativeOp = nativeBinOps[expr.operator];
+			// Special handling of + for string concatenation
+			if (nativeOp && expr.operator === "+") {
+				// biome-ignore format:
+				return [
+                    ...left,
+                    ...fn.call(func().is_string),
+                    ...right,
+                    ...fn.call(func().is_string),
+                    ...i32.or(), // is_string(left) || is_string(right)
+                    ...if_.start(valType("i32")),
+                        ...left,
+                        ...right,
+                        ...fn.call(func().concat),
+                    ...if_.else(),
+                        ...left,
+                        ...fn.call(func().is_bool),
+                        ...right,
+                        ...fn.call(func().is_bool),
+                        ...i32.or(),
+                        ...if_.start(valType("i32")), // is_bool(left) || is_bool(right)
+                            ...left,
+                            ...fn.call(func().to_number),
+                            ...fn.call(func().unbox_number),
+                            ...right,
+                            ...fn.call(func().to_number),
+                            ...fn.call(func().unbox_number),
+                            ...f64.add(),
+                            ...fn.call(func().box_number),
+                        ...if_.else(), // just add them otherwise
+                            ...left,
+                            ...fn.call(func().unbox_number),
+                            ...right,
+                            ...fn.call(func().unbox_number),
+                            ...f64.add(),
+                            ...fn.call(func().box_number),
+                        ...if_.end(), // bool
+                    ...if_.end(), // string
+                ];
+			}
+
 			// Native operators supported for f64
 			if (nativeOp !== null) {
 				const ops: number[] = [
@@ -554,7 +631,7 @@ const compileExpression = (
 						...fn.call(func().unbox_number),
 						...right,
 						...fn.call(func().unbox_number),
-						...fn.call(func().pow),
+						...fn.call(func().math_pow),
 						...fn.call(func().box_number),
 					];
 				case "and": {
@@ -623,6 +700,21 @@ const compileExpression = (
 		case "FunctionCallExpression": {
 			const { name, args } = expr;
 			const f = userDefinedFunctions.find((fn) => fn.name === name.name);
+			if (name.name === "is_string") {
+				if (expr.args.length !== 1) {
+					throw new CompilerError(
+						"is_string expects 1 argument",
+						expr.loc.start.line,
+						expr.loc.start.column,
+						name.name.length,
+					);
+				}
+				return [
+					...args.flatMap((arg) => compileExpression(arg, strings)),
+					...fn.call(func().is_string), // returns boxed bool
+					...fn.call(func().box_bool),
+				];
+			}
 			if (!f) {
 				throw new CompilerError(
 					`Function "${name.name}" is not defined`,
