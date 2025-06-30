@@ -374,8 +374,10 @@ function App() {
 					</div>
 				</div>
 				<div className="w-9 bg-gray-800 md:hidden flex-shrink-0 relative">
-					<div className="transform origin-right rotate-90 text-gray-400 fixed top-1/2 right-4.5 -translate-y-1/2 flex gap-2 text-md">
-						{"<-"} scroll bar {"->"}
+					<div className="h-app-vh">
+						<div className="transform origin-right rotate-90 text-gray-400 fixed top-1/2 right-4.5 -translate-y-1/2 flex gap-2 text-md">
+							{"<-"} scroll bar {"->"}
+						</div>
 					</div>
 				</div>
 			</div>
