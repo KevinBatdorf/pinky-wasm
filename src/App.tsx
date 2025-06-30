@@ -186,8 +186,8 @@ function App() {
 	};
 	return (
 		<>
-			<div className="bg-gray-800 p-6 md:hidden">
-				The demo works on mobile, but it's more interactive on desktop.
+			<div className="bg-gray-800 p-2 text-sm text-center md:hidden text-gray-400">
+				This demo is more interactive on wider screens.
 			</div>
 			<div className="flex">
 				<div
@@ -366,7 +366,11 @@ function App() {
 						</pre>
 					</div>
 				</div>
-				<div className="w-10 bg-gray-800 md:hidden flex-shrink-0" />
+				<div className="w-9 bg-gray-800 md:hidden flex-shrink-0 relative">
+					<div className="transform origin-right rotate-90 text-gray-400 fixed top-1/2 right-4.5 -translate-y-1/2 flex gap-2 text-md">
+						{"<-"} scroll bar {"->"}
+					</div>
+				</div>
 			</div>
 		</>
 	);
