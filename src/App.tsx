@@ -213,7 +213,7 @@ function App() {
             "
 				>
 					<div
-						className="w-full p-1 overflow-hidden flex flex-col h-app-vh md:h-screen border-gray-800 md:border-r pt-6 md:pt-1
+						className="w-full p-1 overflow-hidden flex flex-col h-[var(--app-vh)] md:h-screen border-gray-800 md:border-r pt-6 md:pt-1
                 sm:col-span-2
                 md:col-span-1
                 lg:col-start-2
@@ -251,38 +251,13 @@ function App() {
 						/>
 					</div>
 					<div
-						className="text-sm p-1 flex flex-col overflow-hidden h-app-vh md:h-full border-gray-800 sm:border-r
+						className="text-sm p-1 overflow-hidden flex flex-col h-[var(--app-vh)] md:h-full border-gray-800 md:border-r md:border-t lg:border-t-0
                 sm:col-start-1
                 md:col-start-2
-                lg:col-start-1
-
-                row-span-1
-                lg:row-span-2
-                xl:row-span-1
-                md:row-start-2
-                "
-					>
-						<div className="flex items-center justify-between bg-black">
-							<span className="">tokens</span>
-							<span className="text-xs text-gray-500">
-								({tokenPerf.toFixed(2)}ms)
-							</span>
-						</div>
-						<pre className="selection:bg-yellow-500 selection:text-black overflow-x-hidden overflow-y-auto flex-grow">
-							<TokensComponent
-								tokens={tokens}
-								error={tokenError}
-								handleHover={debouncedHandleHover}
-								handleLeave={debouncedHandleLeave}
-							/>
-						</pre>
-					</div>
-					<div
-						className="text-sm p-1 overflow-hidden flex flex-col h-app-vh md:h-full border-gray-800 md:border-r md:border-t lg:border-t-0
-                sm:col-start-2
                 lg:col-start-3
                 lg:col-span-1
 
+                row-span-1
                 lg:row-span-2
                 xl:row-span-1
                 md:row-start-1
@@ -323,14 +298,40 @@ function App() {
 						</pre>
 					</div>
 					<div
-						className="text-sm p-1 h-app-vh md:h-full border-gray-800 sm:border-r overflow-hidden flex flex-col
+						className="text-sm p-1 flex flex-col overflow-hidden h-[var(--app-vh)] md:h-full border-gray-800 sm:border-r
+                sm:col-start-2
+                lg:col-start-1
+
+                row-span-1
+                lg:row-span-2
+                sm:row-start-2
+                lg:row-start-1
+                "
+					>
+						<div className="flex items-center justify-between bg-black">
+							<span className="">tokens</span>
+							<span className="text-xs text-gray-500">
+								({tokenPerf.toFixed(2)}ms)
+							</span>
+						</div>
+						<pre className="selection:bg-yellow-500 selection:text-black overflow-x-hidden overflow-y-auto flex-grow">
+							<TokensComponent
+								tokens={tokens}
+								error={tokenError}
+								handleHover={debouncedHandleHover}
+								handleLeave={debouncedHandleLeave}
+							/>
+						</pre>
+					</div>
+					<div
+						className="text-sm p-1 h-[var(--app-vh)] md:h-full border-gray-800 sm:border-r overflow-hidden flex flex-col
                 sm:col-start-1
                 md:col-start-3
                 lg:col-start-4
 
                 sm:row-start-3
                 md:row-start-1
-                lg:row-span-1
+                row-span-1
                 "
 					>
 						<div className="flex items-center justify-between text-sm bg-black">
@@ -351,7 +352,7 @@ function App() {
 						</div>
 					</div>
 					<div
-						className="flex flex-col text-sm p-1 h-app-vh md:h-full border-gray-800 md:border-t xl:border-t-0 overflow-hidden
+						className="flex flex-col text-sm p-1 h-[var(--app-vh)] md:h-full border-gray-800 md:border-t xl:border-t-0 overflow-hidden
                 sm:col-start-2
                 md:col-start-3
                 lg:col-start-4
@@ -372,10 +373,10 @@ function App() {
 							<ByteCode bytes={bytes} strings={strings} error={compilerError} />
 						</pre>
 					</div>
-					<div className="h-64 bg-gray-800 md:hidden" />
+					<div className="h-64 bg-gray-800 md:hidden col-span-1 sm:col-span-2" />
 				</div>
 				<div className="w-9 bg-gray-800 md:hidden flex-shrink-0 relative">
-					<div className="h-app-vh">
+					<div className="h-[var(--app-vh)]">
 						<div className="transform origin-right rotate-90 text-gray-400 fixed top-1/2 right-4.5 -translate-y-1/2 flex gap-2 text-md">
 							{"<-"} scroll bar {"->"}
 						</div>
