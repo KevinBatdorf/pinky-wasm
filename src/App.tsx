@@ -266,7 +266,7 @@ function App() {
 						<div className="flex items-center justify-between text-sm bg-black">
 							<span>output</span>
 							<span className="text-xs text-gray-500">
-								(wip {outputPerf.toFixed(2)}ms)
+								({outputPerf.toFixed(2)}ms)
 							</span>
 						</div>
 						<pre className="overflow-x-hidden overflow-y-auto">
@@ -366,7 +366,7 @@ function App() {
 						<div className="flex items-center justify-between text-sm bg-black">
 							<span>wasm</span>
 							<span className="text-xs text-gray-500">
-								(wip {compilerPerf.toFixed(2)}ms)
+								({compilerPerf.toFixed(2)}ms)
 							</span>
 						</div>
 						<pre className="selection:bg-blue-700 selection:text-white overflow-x-hidden overflow-y-auto flex-grow whitespace-pre-wrap">
