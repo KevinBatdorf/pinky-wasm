@@ -10,10 +10,6 @@
 @theme {
 	--font-mono: "JetBrainsMono", monospace;
 }
-.h-app-vh {
-	height: var(--app-vh);
-}
-
 textarea:focus-visible,
 input:focus-visible {
 	@apply outline-none;
