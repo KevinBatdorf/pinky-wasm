@@ -387,6 +387,7 @@ const ensureSpaceFunctionBody = [
 	...fn.end(),
 ];
 
+// To make this easier, everything is boxed as i32
 const boxNumberFunctionBody = [
 	// incoming param: f64 value
 	...local.declare("i32"), // temp_ptr
