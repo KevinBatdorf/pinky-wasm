@@ -187,7 +187,7 @@ function App() {
 	return (
 		<>
 			<div className="bg-gray-800 p-2 px-1 text-sm text-center md:hidden text-gray-400">
-				This demo is more interactive on wider screens.
+				Demo is more interactive on wider screens.
 			</div>
 			<div className="flex">
 				<div
