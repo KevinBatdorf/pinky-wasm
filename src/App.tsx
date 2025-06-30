@@ -206,7 +206,7 @@ function App() {
             "
 				>
 					<div
-						className="w-full p-1 overflow-hidden flex flex-col h-lvh md:h-screen border-gray-800 md:border-r pt-6 md:pt-1
+						className="w-full p-1 overflow-hidden flex flex-col h-svh md:h-screen border-gray-800 md:border-r pt-6 md:pt-1
                 sm:col-span-2
                 md:col-span-1
                 lg:col-start-2
@@ -244,7 +244,7 @@ function App() {
 						/>
 					</div>
 					<div
-						className="text-sm p-1 flex flex-col overflow-hidden h-lvh md:h-full border-gray-800 sm:border-r
+						className="text-sm p-1 flex flex-col overflow-hidden h-svh md:h-full border-gray-800 sm:border-r
                 sm:col-start-1
                 md:col-start-2
                 lg:col-start-1
@@ -271,7 +271,7 @@ function App() {
 						</pre>
 					</div>
 					<div
-						className="text-sm p-1 overflow-hidden flex flex-col h-lvh md:h-full border-gray-800 md:border-r md:border-t lg:border-t-0
+						className="text-sm p-1 overflow-hidden flex flex-col h-svh md:h-full border-gray-800 md:border-r md:border-t lg:border-t-0
                 sm:col-start-2
                 lg:col-start-3
                 lg:col-span-1
@@ -316,7 +316,7 @@ function App() {
 						</pre>
 					</div>
 					<div
-						className="text-sm p-1 h-lvh md:h-full border-gray-800 sm:border-r overflow-hidden flex flex-col
+						className="text-sm p-1 h-svh md:h-full border-gray-800 sm:border-r overflow-hidden flex flex-col
                 sm:col-start-1
                 md:col-start-3
                 lg:col-start-4
@@ -344,7 +344,7 @@ function App() {
 						</div>
 					</div>
 					<div
-						className="flex flex-col text-sm p-1 h-lvh md:h-full border-gray-800 md:border-t xl:border-t-0 overflow-hidden
+						className="flex flex-col text-sm p-1 h-svh md:h-full border-gray-800 md:border-t xl:border-t-0 overflow-hidden
                 sm:col-start-2
                 md:col-start-3
                 lg:col-start-4
