@@ -364,7 +364,7 @@ function App() {
                 "
 					>
 						<div className="flex items-center justify-between text-sm bg-black">
-							<span>wasm bytecode</span>
+							<span>wasm</span>
 							<span className="text-xs text-gray-500">
 								(wip {compilerPerf.toFixed(2)}ms)
 							</span>
