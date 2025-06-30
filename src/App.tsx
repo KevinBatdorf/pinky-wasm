@@ -129,31 +129,40 @@ function App() {
 		}
 	}, [bytes, run, astError, compilerError, tokenError]);
 
-	const handleHover = useCallback((loc: Location) => {
-		// If text is selected or they are selecting, don't bother
-		if (isMouseDown.current) return;
-		const selection = window.getSelection();
-		if (selection?.toString()?.length) return;
+	const handleHover = useCallback(
+		(loc: Location) => {
+			// If text is selected or they are selecting, don't bother
+			if (isMouseDown.current) return;
+			const selection = window.getSelection();
+			if (selection?.toString()?.length) return;
 
-		//ignore < 768px
-		if (window.innerWidth < 768) {
-			// setHoveredToken(null);
-			return;
-		}
-		setHoveredToken((prev) => {
-			const { start, end } = loc;
-			if (
-				!prev ||
-				prev.start.line !== start.line ||
-				prev.start.column !== start.column ||
-				prev.end.line !== end.line ||
-				prev.end.column !== end.column
-			) {
-				return loc;
+			// If there's an error, don't hover
+			if (astError || tokenError || compilerError) {
+				return;
 			}
-			return prev;
-		});
-	}, []);
+
+			//ignore < 768px
+			if (window.innerWidth < 768) {
+				// setHoveredToken(null);
+				return;
+			}
+			setHoveredToken((prev) => {
+				const { start, end } = loc;
+				if (
+					!prev ||
+					prev.start.line !== start.line ||
+					prev.start.column !== start.column ||
+					prev.end.line !== end.line ||
+					prev.end.column !== end.column
+				) {
+					return loc;
+				}
+				return prev;
+			});
+		},
+		[astError, tokenError, compilerError],
+	);
+
 	const handleLeave = useCallback(() => {
 		setHoveredToken(null);
 	}, []);
