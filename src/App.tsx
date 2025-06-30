@@ -372,6 +372,7 @@ function App() {
 							<ByteCode bytes={bytes} strings={strings} error={compilerError} />
 						</pre>
 					</div>
+					<div className="h-64 bg-gray-800 md:hidden" />
 				</div>
 				<div className="w-9 bg-gray-800 md:hidden flex-shrink-0 relative">
 					<div className="h-app-vh">
