@@ -1,8 +1,8 @@
 # Pinky Lang WebAssembly Compiler
 
-### A lexer, parser, and WebAssembly byte code (wasm) generator
+### A lexer, parser, and WebAssembly (wasm) generator
 
-I built this to apply what I'm learning of lexers, parsers, and code generators. And to practice writing raw WebAssembly bytecode. Feedback and contributions are welcome, especially if you find bugs or want to help me learn something to improve.
+I built this to apply what I'm learning of lexers, parsers, and code generators. And to practice writing WebAssembly at the bytecode level. Feedback and contributions are welcome, especially if you find bugs or want to point out something I'm doing wrong (or could do better).
 
 Interactive demo here [http://pinky.cool.omg.lol](http://pinky.cool.omg.lol).
 
