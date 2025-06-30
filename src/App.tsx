@@ -224,22 +224,27 @@ function App() {
                 "
 					>
 						<div className="flex items-center justify-between text-sm bg-black">
-							<a
-								href="https://pinky-lang.org/"
-								target="_blank"
-								rel="noopener noreferrer"
-								className="pl-4 text-[#FF66C4]"
-							>
+							<div className="pl-4 text-[#FF66C4]">
 								Pinky Scripting Language
-							</a>
-							<a
-								target="_blank"
-								rel="noopener noreferrer"
-								href="https://github.com/KevinBatdorf/pinky-wasm"
-								className="text-xs text-gray-500"
-							>
-								(GitHub)
-							</a>
+							</div>
+							<div className="flex gap-1.5">
+								<a
+									href="https://pinky-lang.org/"
+									target="_blank"
+									rel="noopener noreferrer"
+									className="text-xs text-gray-500 hover:text-[#FF66C4] transition-colors duration-200"
+								>
+									(docs)
+								</a>
+								<a
+									target="_blank"
+									rel="noopener noreferrer"
+									href="https://github.com/KevinBatdorf/pinky-wasm"
+									className="text-xs text-gray-500 hover:text-[#FF66C4] transition-colors duration-200"
+								>
+									(GitHub)
+								</a>
+							</div>
 						</div>
 						<CodeEditor
 							parseError={astError}
