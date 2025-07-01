@@ -61,7 +61,7 @@ println 1 >= 4
 
 println "\n== Variables and Scope =="
 x := 5
-    println x
+println x
 if true then
     local x := 10
     println x
@@ -97,7 +97,7 @@ greet()
 
 func add(a, b)
     ret a + b
-    end
+end
 println add(7, 8)
 
 func square(n)
