@@ -1,37 +1,35 @@
 func mandelbrot(cx, cy)
-x := 0
-y := 0
-iter := 0
-max := 16
-while x*x + y*y <= 4 and iter < max do
-    xtemp := x*x - y*y + cx
-    y := 2 * x * y + cy
-    x := xtemp
-    iter := iter + 1
-end
-ret iter
+    x := 0
+    y := 0
+    iter := 0
+    max := 16
+    while x*x + y*y <= 4 and iter < max do
+        xtemp := x*x - y*y + cx
+        y := 2 * x * y + cy
+        x := xtemp
+        iter := iter + 1
+    end
+    ret iter
 end
 
 height := 16
 width := 22
-
 yi := 0
 while yi < height do
-y0 := (yi / height) * 2.0 - 1.0
-
-xi := 0
-while xi < width do
-    x0 := (xi / width) * 3.5 - 2.5
-    m := mandelbrot(x0, y0)
-    if m == 16 then
-    print "⚡"
-    else
-    print " "
+    y0 := (yi / height) * 2.0 - 1.0
+    xi := 0
+    while xi < width do
+        x0 := (xi / width) * 3.5 - 2.5
+        m := mandelbrot(x0, y0)
+        if m == 16 then
+            print "⚡"
+        else
+            print " "
+        end
+        xi := xi + 1
     end
-    xi := xi + 1
-end
-println ""
-yi := yi + 1
+    println ""
+    yi := yi + 1
 end
 
 println "\n== Literals and Operators =="
@@ -63,7 +61,7 @@ println 1 >= 4
 
 println "\n== Variables and Scope =="
 x := 5
-    println x
+println x
 if true then
     local x := 10
     println x
@@ -99,12 +97,12 @@ greet()
 
 func add(a, b)
     ret a + b
-    end
+end
 println add(7, 8)
 
 func square(n)
     ret n * n
-    end
+end
 println square(4)
 
 func fact(n)
@@ -123,11 +121,11 @@ println "val: " + add(1, 2)
 
 println "\n== Return in Branches =="
 func check(flag)
-if flag then
-    ret "yes"
-else
-    ret "no"
-end
+    if flag then
+        ret "yes"
+    else
+        ret "no"
+    end
 end
 println check(true)
 println check(false)
