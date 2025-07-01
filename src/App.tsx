@@ -224,9 +224,7 @@ function App() {
                 "
 					>
 						<div className="flex items-center justify-between text-sm bg-black">
-							<div className="pl-4 text-[#FF66C4]">
-								Pinky Scripting Language
-							</div>
+							<div className="pl-4 text-[#FF66C4]">Pinky Playground</div>
 							<div className="flex gap-1.5">
 								<a
 									href="https://pinky-lang.org/"
