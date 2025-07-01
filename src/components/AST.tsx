@@ -527,7 +527,7 @@ const ExpressionDisplay = ({
 						/>
 						<div
 							style={{ marginLeft: `${indent * 8}px` }}
-							className="text-[#8BD5CA] mb-1"
+							className="text-[#8BD5CA] my-1"
 						>
 							<span className="invisible">└</span> {expression.operator}
 						</div>
@@ -554,7 +554,7 @@ const ExpressionDisplay = ({
 					</div>
 					<div
 						style={{ marginLeft: `${indent * 8}px` }}
-						className="text-[#8BD5CA] mb-1"
+						className="text-[#8BD5CA] my-1"
 					>
 						<span className="invisible">└</span> {expression.operator}
 					</div>
@@ -580,7 +580,7 @@ const ExpressionDisplay = ({
 					</div>
 					<div
 						style={{ marginLeft: `${indent * 8}px` }}
-						className="text-[#CAD3F5] mb-1"
+						className="text-[#CAD3F5]"
 					>
 						<span className="invisible">└</span> {expression.name}
 					</div>
