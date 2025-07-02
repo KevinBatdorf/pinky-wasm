@@ -1,22 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Token } from "./tokens";
+import type {
+	Token,
+	TokenErrorType,
+	ParseErrorType,
+	CompilerErrorType,
+	Program,
+	Location,
+	RunFunction,
+} from "pinky-compiler";
+import { parse, compile, tokenize, init } from "pinky-compiler";
 import { CodeEditor } from "./components/Editor";
 import example from "./example.pinky";
 import { TokensComponent } from "./components/Tokens";
-import { tokenize, type TokenErrorType } from "./lexer";
-import { parse } from "./parser";
 import { ASTComponent } from "./components/AST";
-import type { ParseErrorType } from "./parser";
-import type { Program, Location } from "./syntax";
-import { compile, type CompilerErrorType } from "./compiler";
 import { ByteCode } from "./components/ByteCode";
-import { loadWasm, type RunFunction } from "./compiler/exports";
 
 console.log("Hey there! 👋 Welcome to the Pinky WASM demo app!");
 
 function App() {
 	const [code, setCode] = useState<string>(example);
-	const [run, setRun] = useState<RunFunction | null>(null);
+	const [run, setRun] = useState<RunFunction>();
 	const [hovered, setHoveredToken] = useState<Location | null>(null);
 	const isMouseDown = useRef(false);
 	const hoverTimeout = useRef<number | null>(null);
@@ -38,7 +41,7 @@ function App() {
 	}, []);
 
 	useEffect(() => {
-		loadWasm().then(({ run }) => setRun(() => run));
+		init().then(({ run }) => setRun(() => run));
 	}, []);
 
 	useEffect(() => {

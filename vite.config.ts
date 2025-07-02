@@ -9,20 +9,6 @@ export default defineConfig({
 		react(),
 		tailwindcss(),
 		{
-			name: "debug-wat-before-tests",
-			enforce: "pre",
-			buildStart() {
-				try {
-					execSync("npm run debug:wat", { stdio: "inherit" });
-				} catch (err) {
-					console.error(
-						"debug:wat failed but continuing test run...\n",
-						err.message || err,
-					);
-				}
-			},
-		},
-		{
 			name: "pinky-loader",
 			enforce: "pre",
 			transform(code, id) {

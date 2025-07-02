@@ -9,6 +9,8 @@ I built this to apply what I'm learning of lexers, parsers, and code generators.
 
 Interactive demo here [http://pinky.cool.omg.lol](http://pinky.cool.omg.lol).
 
+The compiler code has been moved to a separate package, [pinky-compiler](https://github.com/KevinBatdorf/pinky-compiler) and published on npm.
+
 ---
 
 Pinky is a simple scripting language that is designed for learning more about compilers and interpreters. It has a very simple syntax and is designed to be easy to understand. Read more about it at [https://pinky-lang.org/](https://pinky-lang.org/).
