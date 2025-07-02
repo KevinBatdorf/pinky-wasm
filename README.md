@@ -3,13 +3,13 @@
 ### A lexer, parser, and WebAssembly (wasm) generator
 
 
-I built this to apply what I'm learning of lexers, parsers, and code generators. And to practice writing WebAssembly at the bytecode level. Feedback and contributions are welcome, especially if you find bugs or want to point out something I'm doing wrong (or could do better).
+I built this to apply what I'm learning of lexers, parsers, and code generators. And to practice writing WebAssembly at the bytecode level. Feedback and contributions are welcome!
+
+The compiler code has been moved to a separate package, [pinky-compiler](https://github.com/KevinBatdorf/pinky-compiler) and published on npm. Go there to see the code and documentation for the compiler itself.
 
 ![Pinky Playground Screenshot](public/screenshot.png)
 
 Interactive demo here [http://pinky.cool.omg.lol](http://pinky.cool.omg.lol).
-
-The compiler code has been moved to a separate package, [pinky-compiler](https://github.com/KevinBatdorf/pinky-compiler) and published on npm.
 
 ---
 
