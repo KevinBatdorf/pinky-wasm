@@ -1,4 +1,4 @@
-import type { CompilerErrorType } from "../compiler";
+import type { CompilerErrorType } from "pinky-compiler";
 
 export const ByteCode = ({
 	bytes,

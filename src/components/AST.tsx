@@ -1,6 +1,11 @@
 import { useEffect, useRef } from "react";
-import type { AST, ParseErrorType } from "../parser";
-import type { Expression, Location, Statement } from "../syntax";
+import type {
+	AST,
+	ParseErrorType,
+	Expression,
+	Location,
+	Statement,
+} from "pinky-compiler";
 type ASTType = {
 	ast: AST;
 	error?: ParseErrorType;
