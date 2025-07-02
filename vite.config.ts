@@ -1,7 +1,6 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { execSync } from "node:child_process";
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -26,10 +25,4 @@ export default defineConfig({
 			},
 		},
 	],
-	test: {
-		coverage: {
-			reporter: ["text", "json-summary", "json"],
-			reportOnFailure: false,
-		},
-	},
 });
