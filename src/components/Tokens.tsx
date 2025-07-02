@@ -1,7 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { Token } from "../tokens";
-import type { TokenErrorType } from "../lexer";
-import type { Location } from "../syntax";
+import type { Token, TokenErrorType, Location } from "pinky-compiler";
 type TokensType = {
 	tokens: Token[];
 	error?: TokenErrorType;

@@ -6,10 +6,12 @@ import {
 	type DecorationItem,
 	type Highlighter,
 } from "shiki";
-import type { Location } from "../syntax";
-import type { ParseErrorType } from "../parser";
-import type { TokenErrorType } from "../lexer";
-import type { CompilerErrorType } from "../compiler";
+import type {
+	Location,
+	ParseErrorType,
+	TokenErrorType,
+	CompilerErrorType,
+} from "pinky-compiler";
 
 type CodeEditorProps = {
 	value: string;
